@@ -1,14 +1,17 @@
 import random
 
-
-
 class Clinic:
+    '''Class to model the clinic object in the question'''
     def __init__(self, name, demand, distance):
         self.name = name
         self.demand = demand
         self.distance = distance
 
-def optimize_supply_chain(clinics, total_supplies):
+def optimize_supply_chain(clinics: list[Clinic], total_supplies: int) -> tuple[int, list]:
+    '''
+    Helper funtion that uses a bottom-up dp approach to optimise supply chain.
+    It takes in clinics (array/vector) and total_supplies (int/number)
+    '''
     n = len(clinics)
     dp = [[0] * (total_supplies + 1) for _ in range(n + 1)]
     decision = [[0] * (total_supplies + 1) for _ in range(n + 1)]
