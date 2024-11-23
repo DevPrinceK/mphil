@@ -1,6 +1,5 @@
 import random
 
-
 class BTreeNode:
     """
     A node in the B-tree structure.
