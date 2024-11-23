@@ -1,3 +1,5 @@
+import random
+
 
 class BTreeNode:
     """
@@ -133,33 +135,35 @@ class MicrofinanceBTree:
             return node.values[i]
         return None if node.leaf else self._search_recursive(node.children[i], customer_id)
 
-def create_dummy_data():
+def create_dummy_data(loan_recs: int = 3, total_customers: int = 3):
     """
     Creates a B-tree with sample customer and loan data for testing.
     """
     btree = MicrofinanceBTree(t=3)
     
+   
     loans = [
         LoanRecord(id, amount, rate, months, "Active")
         for id, amount, rate, months in [
-            (1, 1000.00, 0.15, 12),
-            (2, 500.00, 0.12, 6),
-            (3, 2000.00, 0.10, 24)
+            (indx, random.randint(500, 5000), random.uniform(0, 1), random.randint(1, 48)) for indx in range(1, loan_recs) # 48 months = 4 years
         ]
     ]
     
+    # dummy names and locations banks.
+    locations = ['North Legon', 'East Legon', 'Madina', 'Accra', 'Kasoa', 'Ashiama', 'Lapas', 'Shiashi']
+    names = ['Akwesi', 'Stigar', 'Bertha', 'Gifty', 'Prince', 'Arthur', 'Ofori', 'Linda', 'Samuel', 'Simon', 'Osei']
+
+    # create customer records using nested list comprehensions
     customers = [
         CustomerRecord(id, name, location, score)
         for id, name, location, score in [
-            (101, "John Doe", "Nairobi", 750),
-            (102, "Jane Smith", "Lagos", 800),
-            (103, "Mike Johnson", "Accra", 650),
-            (104, "Sarah Williams", "Kampala", 720),
-            (105, "Robert Brown", "Addis Ababa", 680)
+            (100 + indx, f"{random.choice(names)} {random.choice(names)}", random.choice(locations), random.randint(500, 1000)) for indx in range(1, total_customers)
+           
         ]
     ]
     
-    for customer, loan in zip(customers[:3], loans):
+    # assign loans to customers.
+    for customer, loan in zip(customers[:total_customers], loans):
         customer.loans.append(loan)
     
     for customer in customers:
@@ -167,13 +171,13 @@ def create_dummy_data():
     
     return btree
 
-def test_btree():
+def test_btree(total_loans: int, total_customers: int):
     """
     Tests the B-tree implementation with sample data.
     """
-    btree = create_dummy_data()
+    btree = create_dummy_data(loan_recs=total_loans, total_customers=total_customers)
     
-    test_ids = [101, 103, 999]
+    test_ids = [101, 103, 108, 105, 111, 201, 999]
     
     for customer_id in test_ids:
         print(f"\nSearching for customer ID {customer_id}:")
@@ -188,5 +192,7 @@ def test_btree():
             print("Customer not found")
 
 if __name__ == "__main__":
-    test_btree()
+    customers = input('Enter Total Customers: ')
+    loans = input('Enter Total Loans: ')
+    test_btree(int(loans), int(customers))
 
