@@ -26,7 +26,7 @@ N = len(data)
 # plt.show()
 
 # Use the same random mask as in the VAE script for fair comparison
-missing_rate = 0.2
+missing_rate = 0.3
 np.random.seed(42)
 mask = np.ones(N, dtype=bool)
 missing_indices = np.random.choice(N, size=int(N * missing_rate), replace=False)
@@ -72,8 +72,16 @@ interp_imputed = pd.Series(interp_imputed).interpolate(method='linear').bfill().
 interp_mae = np.mean(np.abs(interp_imputed[~mask] - data[~mask]))
 interp_rmse = np.sqrt(np.mean((interp_imputed[~mask] - data[~mask]) ** 2))
 
+# Traditional imputation methods (1): Mean, Median, Mode
 print(f"Mean Imputation MAE: {mean_mae:.4f}, RMSE: {mean_rmse:.4f}")
 print(f"Median Imputation MAE: {median_mae:.4f}, RMSE: {median_rmse:.4f}")
 print(f"Mode Imputation MAE: {mode_mae:.4f}, RMSE: {mode_rmse:.4f}")
+
+# Traditional imputation methods (2): Forward Fill, Linear Interpolation
 print(f"Forward Fill MAE: {ffill_mae:.4f}, RMSE: {ffill_rmse:.4f}")
 print(f"Linear Interpolation MAE: {interp_mae:.4f}, RMSE: {interp_rmse:.4f}")
+
+# Traditional imputation methods (3): TBD
+# 1. Last Observation carried forward
+# 2. Last Observation carried backward
+# 3. Hot-deck imputation

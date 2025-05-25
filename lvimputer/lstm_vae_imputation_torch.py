@@ -24,7 +24,7 @@ data = temperature_series.values
 N = len(data)
 
 # Choose missingness rate (e.g., 20%)
-missing_rate = 0.2
+missing_rate = 0.3
 np.random.seed(42)
 mask = np.ones(N, dtype=bool)
 missing_indices = np.random.choice(N, size=int(N * missing_rate), replace=False)
@@ -36,7 +36,7 @@ mask[-5:] = False  # last 5 values missing
 
 # Mask outliers in addition to random missing values
 # Using rolling 3-sigma (24-hour window) times 7 days for outlier detection
-window = 24 * 7  # 24 hours times 7 days, assuming hourly data
+window = 24  # 24 hours times 7 days, assuming hourly data
 rolling_mean = pd.Series(data, index=df.index).rolling(window=window, min_periods=1, center=True).mean().values
 rolling_std = pd.Series(data, index=df.index).rolling(window=window, min_periods=1, center=True).std().values
 outlier_threshold = 3
@@ -56,7 +56,7 @@ input_mask   = torch.tensor(mask.astype(float), dtype=torch.float32).unsqueeze(1
 model_input  = torch.cat([input_values, input_mask], dim=1)
 
 class LSTMVAE(nn.Module):
-    def __init__(self, input_dim=2, hidden_dim=32, latent_dim=16, num_layers=2): # testing with 2 layers
+    def __init__(self, input_dim=2, hidden_dim=32, latent_dim=16, num_layers=1): # testing with 1 layers
         """
         LSTM Variational Autoencoder for time series imputation.
         Args:
@@ -141,7 +141,7 @@ mask_train = mask_train.to(device)
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
 model.train()
-for epoch in range(350):  # e.g., 350 epochs
+for epoch in range(300):  # e.g., 300 epochs
     optimizer.zero_grad()
     recon_seq, mu, logvar = model(x_train)
     loss = vae_loss(recon_seq, y_train, mask_train, mu, logvar)
