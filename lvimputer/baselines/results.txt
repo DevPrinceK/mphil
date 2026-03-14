@@ -1,0 +1,6 @@
+# BASELINE RESULT - STATISTICAL
+Mean Imputation MAE: 23.4044, RMSE: 33.6178
+Median Imputation MAE: 15.2878, RMSE: 36.2795 
+Mode Imputation MAE: 86.3681, RMSE: 92.6800   
+Forward Fill MAE: 0.0324, RMSE: 0.0900        
+Linear Interpolation MAE: 0.0215, RMSE: 0.0622

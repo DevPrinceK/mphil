@@ -1,0 +1,9 @@
+% !TEX root = main.tex
+% -----------------------------------------------------------------------------
+% Chapter 1: Introduction
+% -----------------------------------------------------------------------------
+
+\chapter{Introduction}
+\label{ch:introduction}
+
+Time-series data collected from real-world sensors is frequently affected by missing values and corrupted measurements, which can hinder downstream analysis and decision-making. This thesis investigates imputation methods for reconstructing a plausible underlying signal from partially observed environmental sensor readings, with a focus on temperature measurements. We adopt a reproducible experimental workflow that introduces controlled missingness and outliers, benchmarks simple statistical and interpolation baselines, and evaluates a deep generative sequence model (an LSTM-based Variational Autoencoder) trained using mini-batch gradient descent on sliding windows. The aim is to quantify imputation accuracy and to understand the trade-offs between interpretability, computational cost, and reconstruction quality in practical sensor-data settings.

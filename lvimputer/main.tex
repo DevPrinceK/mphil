@@ -1,0 +1,55 @@
+% -----------------------------------------------------------------------------
+% main.tex — Thesis entry point
+% -----------------------------------------------------------------------------
+% Compile with: pdflatex main.tex (or latexmk -pdf main.tex)
+
+\documentclass[12pt]{report}
+
+% Basic packages used across chapters
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+% -----------------------------------------------------------------------------
+% Shared helpers / formatting
+% -----------------------------------------------------------------------------
+% Figure placeholder used throughout draft chapters before you have image files.
+% Replace \placeholderbox{...} with \includegraphics when figures are ready.
+\newcommand{\placeholderbox}[1]{%
+	\begin{center}
+		\fbox{\parbox{0.9\linewidth}{#1}}
+	\end{center}
+}
+
+% Optional: adjust margins if you need (uncomment and tweak)
+%\usepackage[a4paper,margin=1in]{geometry}
+
+\begin{document}
+
+% Front matter (edit these fields for your thesis)
+\title{\textbf{A Hybrid Missing Data Imputation Technique for Handling Missing Data in IoT Sensor Data Using LSTM and VAEs}}
+\author{Prince Samuel Kyeremanteng}
+\date{\today}
+\maketitle
+
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+
+\pagenumbering{arabic}
+
+% Chapters
+\include{introduction}
+\include{methodology}
+
+% Add more chapters as you create them, e.g.:
+%\include{results}
+%\include{discussion}
+%\include{conclusion}
+
+% References (optional; enable when you add a .bib)
+%\bibliographystyle{plain}
+%\bibliography{references}
+
+\end{document}

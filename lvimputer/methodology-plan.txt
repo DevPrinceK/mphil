@@ -1,0 +1,20 @@
+
+Dataset Criteria:
+-> Volumn
+-> Age
+
+Preprocessing:
+-> Outlier Detection
+-> Outlier Handling
+-> Normalization
+
+Splitting:
+-> Test Data
+-> Train Data
+-> Validation Data
+
+
+
+TODO OPTIMIZATIONS:
+-> Use mini-batches (mini-batch stochastic gradient descent with an adaptive optimizer (AdamW))
+-> Consider gradient clipping.
