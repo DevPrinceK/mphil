@@ -1,0 +1,58 @@
+% !TEX root = main.tex
+% -----------------------------------------------------------------------------
+% Chapter 4: Results and Discussion
+% -----------------------------------------------------------------------------
+
+\chapter{Results and Discussion}
+\label{ch:results-discussion}
+
+\section{Chapter Overview}
+\subsection{Purpose of the evaluation}
+\subsection{Methods compared in this chapter}
+\subsection{Metrics used for analysis}
+
+\section{Experimental Setting}
+\subsection{Dataset and preprocessing recap}
+\subsection{Missingness and masking protocol}
+\subsection{Train, validation, and test configuration}
+\subsection{Implementation details for baseline methods}
+
+\section{Baseline Results}
+\subsection{Statistical baselines}
+\subsection{Machine learning baselines}
+\subsection{Error comparison on masked points}
+\subsection{Behaviour on short and long gaps}
+
+\section{LSTM-VAE Results}
+\subsection{Training dynamics and convergence}
+\subsection{Reconstruction quality on the test sequence}
+\subsection{Windowed inference and overlap stitching}
+\subsection{Observed strengths and weaknesses}
+
+\section{Visual Comparison of Reconstructions}
+\subsection{Overall series reconstruction plots}
+\subsection{Zoomed views around missing segments}
+\subsection{Outlier reconstruction examples}
+\subsection{Cases where methods diverge}
+
+\section{Quantitative Comparison}
+\subsection{MAE comparison across methods}
+\subsection{RMSE comparison across methods}
+\subsection{Ranking of methods by gap type}
+\subsection{Summary of best-performing approach}
+
+\section{Discussion}
+\subsection{Why simpler baselines succeed or fail}
+\subsection{Where the LSTM-VAE adds value}
+\subsection{Effect of window size and sequence context}
+\subsection{Impact of masking strategy on reported performance}
+\subsection{Interpretation of results for sensor data imputation}
+
+\section{Limitations}
+\subsection{Single-sensor scope}
+\subsection{Synthetic masking versus real missingness}
+\subsection{Computational cost and reproducibility considerations}
+
+\section{Chapter Summary}
+\subsection{Key findings}
+\subsection{Transition to the conclusion chapter}
