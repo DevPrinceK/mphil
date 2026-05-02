@@ -9,6 +9,7 @@
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{setspace}
 \usepackage[hidelinks]{hyperref}
 
 % -----------------------------------------------------------------------------
@@ -26,6 +27,8 @@
 %\usepackage[a4paper,margin=1in]{geometry}
 
 \begin{document}
+
+\doublespacing
 
 % Front matter (edit these fields for your thesis)
 \title{\textbf{A Hybrid Missing Data Imputation Technique for Handling Missing Data in IoT Sensor Data Using LSTM and VAEs}}
@@ -48,8 +51,9 @@
 %\include{discussion}
 %\include{conclusion}
 
-% References (optional; enable when you add a .bib)
-%\bibliographystyle{plain}
-%\bibliography{references}
+% References
+\bibliographystyle{plain}
+% bib file in the same folder: thesis/citation.bib -> use key 'citation' (no .bib)
+\bibliography{citation}
 
 \end{document}
