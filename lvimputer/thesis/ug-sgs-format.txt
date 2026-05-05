@@ -1,13 +1,3 @@
-Margins: When bound all margins of the thesis should be 2.54 cm (1 inch).
-
-Font Type & Size: Theses should be typed in New Times Roman Font Size 12.
-
-Chapter headings should be in New Times Roman Font Size 14 Bold.
-
-Font sizes for indented citations, graphs, figures, and tables should not be lower than New Times Roman font size 10.
-
-Page Numbers: Page numbers should be centred at the bottom of the page throughout the thesis.
-
-The preliminary pages should be numbered with Roman numerals.
-
-Page numbering in Arabic numerals should run through the entire thesis.
+version https://git-lfs.github.com/spec/v1
+oid sha256:cbdcc59e45b93830a94b3124934c5571bec94efb72aa47e923be1516a0647f7b
+size 576
