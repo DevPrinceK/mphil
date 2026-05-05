@@ -1,5 +1,3 @@
-_id,sensor,time,val
-1,TCA,2017-12-18T08:47:37,1.61
-2,HUMA,2017-12-18T08:47:37,62.5
-3,LUM,2017-12-18T08:47:37,72.63
-4,MCP,2017-12-18T08:47:37,62
+version https://git-lfs.github.com/spec/v1
+oid sha256:0fe069a3f5d91dac8b8a6c06849487ef77bce3a110216eb915a994b7c3b41df6
+size 144
