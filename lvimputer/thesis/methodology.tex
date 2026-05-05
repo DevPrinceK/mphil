@@ -7,189 +7,256 @@
 \label{ch:methodology}
 
 \section{Chapter Overview}
-This chapter describes the methodology used to investigate time-series imputation for environmental sensor readings. The work follows a controlled and reproducible pipeline that begins with selecting and preprocessing a univariate temperature signal, introduces missing values and outliers in a principled way, and then evaluates multiple imputation strategies. In addition to simple statistical and interpolation baselines, we implement a deep generative sequence model---an LSTM-based Variational Autoencoder (LSTM-VAE)---to reconstruct the underlying temperature trajectory. The chapter also details the training strategy (mini-batch gradient descent on sliding windows), the inference procedure (windowed reconstruction with overlap-averaging), and the evaluation protocol using standard error metrics.
+This chapter describes the methodology used to evaluate missing-data imputation for a univariate IoT sensor time series. The study follows a controlled experimental design: a clean chronological temperature sequence is selected, synthetic missingness is introduced under several scenarios, multiple baseline imputers are applied to the same masks, and a hybrid residual LSTM-VAE model is evaluated against the same ground truth. The method is hybrid because it combines strong deterministic imputation priors with a neural residual model. This design is important for this dataset because simple interpolation is already very competitive for short random gaps, while boundary gaps require broader seasonal context.
+
+The chapter covers the data preparation process, missingness protocol, baseline methods, proposed model architecture, loss function, training procedure, inference procedure, and evaluation metrics. It also defines the imputation-only runtime measurement used to compare practical computational cost across methods.
 
 \section{Research Design and Workflow}
-The overall design of this study is experimental and comparative: we define a consistent data preparation and masking procedure, then apply multiple methods to the same masked inputs and compare their performance against the known ground truth. This approach is appropriate because it allows quantitative evaluation of imputation quality even when the original dataset may not contain explicit labels for missing points. Concretely, the workflow proceeds as follows: (i) load and filter sensor data, (ii) sort readings chronologically and extract the temperature series, (iii) generate a binary observation mask that marks missing values and detected outliers, (iv) prepare model inputs by combining the (possibly corrupted) values with the mask, (v) train the LSTM-VAE using gradient-based optimisation, (vi) generate imputations by reconstructing the time series, and (vii) evaluate imputation quality only at masked positions using MAE and RMSE. Each step is designed to be reproducible: fixed random seeds are used for mask generation and all model hyperparameters are explicitly recorded.
+The research design is experimental and comparative. Every method receives the same observed series and the same missingness mask for a given scenario. Imputation quality is then measured only at the artificially hidden points, where the true values are known. This avoids rewarding a method for simply copying observed values and makes the comparison among methods fair.
+
+The workflow is:
+\begin{enumerate}
+	\item load the timestamped temperature dataset and sort it chronologically;
+	\item construct four missingness scenarios: START, MIDDLE, END, and RANDOM;
+	\item build baseline imputations for each scenario;
+	\item construct a strong prior imputation for the proposed hybrid model;
+	\item train a residual LSTM-VAE on sliding windows of the sequence;
+	\item perform windowed imputation and overlap-averaging;
+	\item compute MAE, RMSE, visual comparisons, win rate against baselines, and imputation-only runtime.
+\end{enumerate}
 
 \begin{figure}[ht]
 	\centering
 	\placeholderbox{\textbf{Insert Figure: End-to-end methodology pipeline.}\\
-	Suggested content: a block diagram showing (1) Raw sensor readings \textrightarrow{} (2) preprocessing \& time index \textrightarrow{} (3) masking (missing + outliers) \textrightarrow{} (4) baselines + LSTM-VAE \textrightarrow{} (5) imputed series \textrightarrow{} (6) evaluation on masked points.\\
-	Purpose: gives the reader a one-glance overview of the experimental workflow.}
+	Suggested content: raw temperature series \textrightarrow{} chronological preprocessing \textrightarrow{} missingness masks \textrightarrow{} baseline imputers and hybrid residual LSTM-VAE \textrightarrow{} imputed series \textrightarrow{} MAE/RMSE, plots, and runtime comparison.}
 	\caption{End-to-end workflow used in this research, from data ingestion to evaluation.}
 	\label{fig:method-pipeline}
 \end{figure}
 
 \section{Dataset and Data Selection}
-The study uses a publicly available sensor dataset containing timestamped environmental measurements. Each record includes date and time fields as well as multiple sensor attributes (e.g., temperature, humidity, light, and voltage). In this thesis we focus on the temperature channel because it is continuous, exhibits temporal structure, and is representative of the type of physical measurements where missingness and corruption are common.
+The implementation uses the file \texttt{data/dataset1.csv}, which contains timestamped temperature readings. The datetime column is parsed into a proper time index, the records are sorted chronologically, and the temperature column is extracted as a one-dimensional signal. The final experimental sequence contains $N=26{,}387$ readings.
 
-To reduce confounding factors and simplify interpretation, we select a single sensor identifier (\texttt{moteid}=1) and analyse its temperature readings over time. Restricting the analysis to one sensor ensures that the imputation task remains univariate and that performance differences can be attributed to modelling choices rather than inter-sensor variability. The resulting dataset is sorted chronologically and indexed by a combined datetime field, which is essential for both interpolation baselines and sequence models that assume temporal ordering.
+The study focuses on a single continuous temperature channel. This keeps the imputation task interpretable: the methods are compared on their ability to recover one ordered physical signal rather than on multivariate interactions. Although multivariate sensor fusion is a useful extension, the present work deliberately isolates the univariate imputation problem.
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Raw temperature time series (selected sensor).}\\
-	Suggested content: line plot of temperature vs. datetime for the chosen sensor, before introducing synthetic missingness.\\
-	Purpose: illustrates the temporal dynamics (trend/seasonality/noise) that the imputation methods must capture.}
-	\caption{Raw temperature time series for the selected sensor after chronological sorting.}
+	\placeholderbox{\textbf{Insert Figure: Raw temperature time series.}\\
+	Suggested content: line plot of temperature against datetime before synthetic masking.}
+	\caption{Raw temperature time series after chronological sorting.}
 	\label{fig:raw-timeseries}
 \end{figure}
 
-\section{Preprocessing and Time-Series Construction}
-Preprocessing transforms the raw tabular data into a clean and ordered time series suitable for imputation experiments. The date and time fields are concatenated and parsed into a single datetime variable, which is used as the index of the dataset. This step enables consistent alignment of readings, simplifies rolling-window statistics for outlier detection, and allows time-aware baseline methods such as forward-fill and interpolation to operate correctly.
-
-The temperature values are cast to floating-point and extracted as a one-dimensional series. The final representation used throughout this work is a NumPy array $\mathbf{x} \in \mathbb{R}^{N}$ containing $N$ temperature readings ordered in time. This univariate representation is the ground truth for evaluation: all imputed values are ultimately compared to the corresponding entries in $\mathbf{x}$.
-
-\section{Missingness and Anomaly (Outlier) Modelling}
-Real-world sensor data often contains both missing values (e.g., due to communication failures) and corrupted measurements (e.g., spikes caused by sensor malfunction). In this methodology, both phenomena are handled through a single binary observation mask $\mathbf{m} \in \{0,1\}^{N}$ where $m_t=1$ indicates that $x_t$ is considered reliable/observed and $m_t=0$ indicates that $x_t$ should be imputed.
-
-\subsection{Random Missingness Injection}
-To enable a fair and quantitative comparison, we inject missingness synthetically by randomly selecting a fixed proportion of indices and marking them as missing. In our experiments, the missing rate is set to 0.3 (30\%), and a fixed random seed is used to ensure that the same mask can be reused across methods. This design choice isolates the imputation problem from other sources of variation: every method is evaluated on the exact same missing positions, making performance comparisons meaningful.
-
-\subsection{Boundary Missingness}
-In addition to random missingness, we explicitly force the first and last few readings to be missing. This stress-tests imputation methods in scenarios where neighbouring context is limited. For example, interpolation-based methods can behave differently at the boundaries because they cannot use both left and right neighbours. Including boundary gaps therefore provides a more comprehensive assessment of robustness.
-
-\subsection{Outlier Detection Treated as Missing}
-Outliers are detected using a rolling $k\sigma$ rule. For each time index $t$, we compute a rolling mean $\mu_t$ and rolling standard deviation $\sigma_t$ using a centred window of fixed length (window size of 24 samples in our implementation). A point is flagged as an outlier if
+\section{Preprocessing and Robust Cleaning}
+The raw temperature values are preserved as the ground truth for evaluation. However, the model-fitting process uses a robustly cleaned version of the series to avoid training the neural model to reproduce extreme sensor artefacts. In the implementation, low sentinel-like values below $-20^\circ$C and large local deviations are treated as training artefacts. A centred rolling median and rolling median absolute deviation (MAD) are used:
 \[
-\lvert x_t - \mu_t \rvert > k \sigma_t,\quad k=3.
+\mathrm{MAD}_t = \mathrm{median}\left(\lvert x_i - \mathrm{median}(x) \rvert\right),
 \]
-Flagged outliers are then treated as missing (i.e., $m_t=0$), so that the imputation model is required to reconstruct a plausible value rather than fitting the spike. This decision is motivated by practical deployment: the goal is to recover a smooth, physically plausible temperature signal, not to reproduce corrupted measurements.
+within a local window. A point is flagged for training cleanup when it is more than a fixed multiple of the robust local scale or falls below the sentinel threshold. These flagged values are filled by time interpolation only for constructing model inputs and training targets.
+
+This distinction is important. The cleaned series stabilises neural training, but the reported MAE and RMSE are still computed against the original raw values at the artificially hidden positions. Therefore, the evaluation remains aligned with the baseline notebooks and does not benefit from changing the test targets.
+
+\section{Missingness Protocol}
+Missingness is injected synthetically so that ground truth remains available. The missing rate is fixed at $30\%$ of the sequence. Four scenarios are evaluated:
+\begin{itemize}
+	\item \textbf{START}: the first $30\%$ of the sequence is hidden;
+	\item \textbf{MIDDLE}: a contiguous $30\%$ block in the centre of the sequence is hidden;
+	\item \textbf{END}: the final $30\%$ of the sequence is hidden;
+	\item \textbf{RANDOM}: $30\%$ of indices are selected uniformly at random using a fixed seed.
+\end{itemize}
+
+These scenarios test different imputation difficulties. RANDOM missingness is well suited to interpolation because nearby observations usually remain available. START and END missingness are harder because one side of the temporal context is absent. MIDDLE missingness tests performance on a long internal gap where both past and future context exist, but the gap is large.
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Missingness and outlier mask visualisation.}\\
-	Suggested content: time-series plot showing (a) observed points, (b) artificially removed points, and (c) detected outliers highlighted in a different colour/marker.\\
-	Purpose: demonstrates how the mask is constructed and how many points are removed by each mechanism.}
-	\caption{Illustration of synthetic missingness and detected outliers on the temperature series.}
+	\placeholderbox{\textbf{Insert Figure: Missingness scenarios.}\\
+	Suggested content: four panels showing START, MIDDLE, END, and RANDOM masks over the same temperature sequence.}
+	\caption{Synthetic missingness scenarios used for controlled evaluation.}
 	\label{fig:mask-visualisation}
 \end{figure}
 
-\section{Model Input Representation}
-Sequence models require a consistent input representation even when some values are missing. We therefore construct a two-channel input at each timestep consisting of (i) the observed value (with missing/outlier points replaced by a placeholder) and (ii) the corresponding mask indicator. Formally, for each timestep $t$ we define an input feature vector $\mathbf{u}_t = [\tilde{x}_t,\; m_t]$, where $\tilde{x}_t$ equals $x_t$ when observed and equals a fixed placeholder value (0.0 in our implementation) when missing.
-
-Including the mask as an explicit input is important: it allows the model to distinguish between a true temperature reading of 0.0 (if that were ever possible) and an imputed placeholder. More generally, it provides the model with the information necessary to learn different dynamics for observed versus missing segments, which improves reconstruction quality.
-
 \section{Baseline Imputation Methods}
-To contextualise the performance of the proposed deep learning model, we evaluate several widely used baseline imputation methods. These baselines are simple, interpretable, and computationally inexpensive; they serve as reference points to assess whether the added complexity of an LSTM-VAE is justified.
+Several baseline methods are included to provide interpretable reference points. The same mask is used for each method in a given missingness scenario.
 
-\subsection{Constant Statistics Baselines}
-We implement mean, median, and mode imputation computed over the observed (unmasked) values. These methods replace every missing entry with a single constant. While they ignore temporal structure, they provide an important lower bound and are common in practice when quick imputation is needed.
+\subsection{Constant Statistical Baselines}
+Mean, median, and mode imputation replace every missing value with a single statistic computed from the observed values. These methods ignore temporal structure, but they provide useful lower bounds and highlight whether a method is doing more than estimating the central tendency of the sequence.
 
-\subsection{Time-Aware Simple Baselines}
-We also include forward-fill/back-fill and linear interpolation. Forward-fill imputes each missing value using the most recent observed value and then uses back-fill to handle initial gaps. Linear interpolation constructs a piecewise-linear estimate between observed points and then fills boundary gaps. These methods exploit temporal adjacency and often perform well for slowly varying physical signals, but they can struggle with long gaps or rapidly changing dynamics.
+\subsection{Sampling Baselines}
+Random and hot-deck imputation fill missing positions by sampling values from the observed set. These approaches preserve the marginal distribution better than a single constant, but they do not preserve temporal ordering.
+
+\subsection{Time-Aware Baselines}
+Forward fill, last observation carried forward (LOCF), last observation carried backward (LOCB), and linear interpolation exploit temporal order. Forward fill and LOCF use the most recent available reading, with back-filling used to handle initial gaps. LOCB uses the next available reading, with forward filling used when needed. Linear interpolation estimates missing values along straight lines between neighbouring observations and then fills boundary values. These methods are strong baselines for slowly varying physical signals.
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Baseline method comparison plot.}\\
-	Suggested content: zoomed-in segment of the series showing ground truth, masked observations, and imputed curves from (mean/median) and (interpolation/forward-fill).\\
-	Purpose: visually motivates why sequence models may outperform simple heuristics in complex segments.}
-	\caption{Example segment comparing baseline imputations to the ground truth on a masked interval.}
+	\placeholderbox{\textbf{Insert Figure: Baseline comparison.}\\
+	Suggested content: zoomed segment showing ground truth, observed values, mean/median, forward fill, and linear interpolation.}
+	\caption{Example segment comparing baseline imputations to the ground truth.}
 	\label{fig:baseline-visual}
 \end{figure}
 
-\section{Proposed Method: LSTM Variational Autoencoder (LSTM-VAE)}
-The central method in this thesis is an LSTM-based Variational Autoencoder designed for time-series reconstruction and imputation. The VAE framework is well-suited to imputation because it learns a compressed latent representation of the entire sequence, enabling the decoder to generate plausible reconstructions even when parts of the input are missing or corrupted.
+\section{Hybrid Prior Construction}
+The proposed method does not ask the neural network to generate the entire temperature sequence from a zero placeholder. Instead, it first constructs a strong prior estimate and then lets the LSTM-VAE learn a residual correction. This improves stability and makes the model competitive with strong simple baselines.
 
-\subsection{Encoder (LSTM)}
-The encoder is implemented as an LSTM that processes the sequence of two-dimensional inputs $\{\mathbf{u}_t\}_{t=1}^{T}$, where $T$ is the sequence length for a training window. The LSTM hidden state summarises the temporal context, capturing dependencies across time that are essential for reconstructing missing values. We use the final hidden state as a compact representation of the input window.
+Two priors are used:
+\begin{itemize}
+	\item \textbf{Time interpolation prior}: used for MIDDLE and RANDOM missingness, where interpolation has access to useful neighbouring observations.
+	\item \textbf{Seasonal KNN prior}: used for START and END missingness, where interpolation lacks one side of the context. The KNN prior matches readings using cyclic calendar features such as time of day and day of year.
+\end{itemize}
 
-\subsection{Latent Space Parameterisation}
-From the final encoder hidden state, two linear layers predict the parameters of an approximate posterior distribution over a latent variable $\mathbf{z}$: a mean vector $\boldsymbol{\mu}$ and a log-variance vector $\log \boldsymbol{\sigma}^2$. This defines
+For each timestamp, calendar features are generated using sine and cosine encodings:
 \[
-q_\phi(\mathbf{z} \mid \mathbf{u}_{1:T}) = \mathcal{N}(\boldsymbol{\mu},\; \mathrm{diag}(\boldsymbol{\sigma}^2)).
+\sin\left(2\pi h_t/24\right),\quad \cos\left(2\pi h_t/24\right),
 \]
-Learning a distribution rather than a single deterministic code encourages the model to capture uncertainty and prevents overfitting to specific windows.
+for hour-of-day, and similarly for day-of-year. A normalised trend feature is also included. These features allow the KNN prior and neural model to use seasonal context without treating calendar time as a discontinuous integer.
 
-\subsection{Reparameterisation Trick}
-To enable gradient-based optimisation through stochastic sampling, we apply the reparameterisation trick:
+\section{Model Input Representation}
+All temperature values are standardised using the mean and standard deviation of the observed training values. At each timestep $t$, the model receives a feature vector
 \[
-\mathbf{z} = \boldsymbol{\mu} + \boldsymbol{\sigma} \odot \boldsymbol{\epsilon}, \quad \boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0},\mathbf{I}).
+\mathbf{u}_t =
+[\tilde{x}^{(z)}_t,\; m_t,\; p^{(z)}_t,\; \mathbf{c}_t],
 \]
-This expresses sampling as a deterministic function of $(\boldsymbol{\mu}, \boldsymbol{\sigma})$ and a noise variable $\boldsymbol{\epsilon}$, allowing gradients to flow back to the encoder parameters.
+where $\tilde{x}^{(z)}_t$ is the standardised filled value, $m_t$ is the binary observation mask, $p^{(z)}_t$ is the standardised prior value, and $\mathbf{c}_t$ contains the calendar features. Missing entries are filled with the prior value rather than with zero. This prevents the model from seeing artificial discontinuities caused by placeholder values and lets it focus on correcting the prior.
 
-\subsection{Decoder and Reconstruction}
-The decoder maps the latent variable $\mathbf{z}$ to an initial hidden state for a second LSTM. The decoder then generates a reconstructed sequence $\hat{\mathbf{x}}_{1:T}$, which represents the model's best estimate of the underlying temperature trajectory for that window. A final linear layer projects decoder hidden states to scalar temperature predictions.
+\section{Proposed Method: Residual LSTM-VAE}
+The proposed model is a residual LSTM-based Variational Autoencoder. The encoder maps a window of input features into a latent distribution, and the decoder predicts a residual sequence that is added to the prior. Therefore, the final prediction is
+\[
+\hat{x}^{(z)}_t = p^{(z)}_t + r_t,
+\]
+where $r_t$ is the residual predicted by the decoder in standardised units.
+
+\subsection{Encoder}
+The encoder is an LSTM that processes an input window $\mathbf{u}_{1:T}$. The final hidden state summarises the local temporal context. Two linear layers map this hidden state to a latent mean vector $\boldsymbol{\mu}$ and log-variance vector $\log \boldsymbol{\sigma}^2$:
+\[
+q_\phi(\mathbf{z} \mid \mathbf{u}_{1:T}) =
+\mathcal{N}(\boldsymbol{\mu}, \mathrm{diag}(\boldsymbol{\sigma}^2)).
+\]
+
+\subsection{Latent Sampling}
+The latent variable is sampled using the reparameterisation trick:
+\[
+\mathbf{z} = \boldsymbol{\mu} + \boldsymbol{\sigma} \odot \boldsymbol{\epsilon},
+\quad
+\boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0}, \mathbf{I}).
+\]
+During evaluation, the mean is used to make the reconstruction deterministic.
+
+\subsection{Decoder}
+The decoder receives the latent code repeated across the window and concatenated with context features, including the prior and calendar features. A decoder LSTM produces hidden states for each timestep, and a residual head maps those hidden states to scalar residual corrections. The architecture therefore retains the generative latent structure of a VAE while grounding the output in a strong deterministic prior.
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: LSTM-VAE architecture diagram.}\\
-	Suggested content: schematic showing two-channel input (value + mask) \textrightarrow{} encoder LSTM \textrightarrow{} $\mu, \log\sigma^2$ \textrightarrow{} sampling $z$ \textrightarrow{} decoder LSTM \textrightarrow{} reconstructed values.\\
-	Purpose: makes the model structure and information flow explicit for the reader.}
-	\caption{Architecture of the proposed LSTM-VAE used for time-series imputation.}
+	\placeholderbox{\textbf{Insert Figure: Residual LSTM-VAE architecture.}\\
+	Suggested content: filled value + mask + prior + calendar features \textrightarrow{} encoder LSTM \textrightarrow{} $\mu,\log\sigma^2$ \textrightarrow{} latent code \textrightarrow{} decoder LSTM \textrightarrow{} residual \textrightarrow{} prior + residual.}
+	\caption{Architecture of the residual LSTM-VAE used for hybrid time-series imputation.}
 	\label{fig:lstm-vae-arch}
 \end{figure}
 
 \section{Objective Function}
-Model parameters are learned by minimising a VAE objective that combines a reconstruction term with a Kullback--Leibler (KL) divergence regulariser. Because the input contains missing values, we compute reconstruction error only on observed points using the mask. For a window of length $T$, the mask-weighted mean squared error is
+The model is trained using a VAE-style objective. The reconstruction term is computed only on observed points in the training mask:
 \[
-\mathcal{L}_{\mathrm{rec}} = \frac{\sum_{t=1}^{T} m_t \left(\hat{x}_t - x_t\right)^2}{\sum_{t=1}^{T} m_t + \varepsilon},
+\mathcal{L}_{\mathrm{rec}} =
+\frac{\sum_{t=1}^{T} m_t \rho(\hat{x}^{(z)}_t - x^{(z)}_t)}
+{\sum_{t=1}^{T} m_t + \varepsilon},
 \]
-where $\varepsilon$ is a small constant to avoid division by zero.
+where $\rho(\cdot)$ is the Smooth L1 loss. Smooth L1 is used instead of plain mean squared error because it is less sensitive to occasional extreme sensor values.
 
-The KL divergence encourages the approximate posterior $q_\phi(\mathbf{z}\mid\mathbf{u})$ to remain close to the standard normal prior $p(\mathbf{z})=\mathcal{N}(\mathbf{0},\mathbf{I})$:
+The KL term regularises the approximate posterior toward the standard normal prior:
 \[
-\mathcal{L}_{\mathrm{KL}} = D_{\mathrm{KL}}\big(q_\phi(\mathbf{z}\mid\mathbf{u})\,\|\,p(\mathbf{z})\big).
+\mathcal{L}_{\mathrm{KL}} =
+D_{\mathrm{KL}}\left(q_\phi(\mathbf{z}\mid\mathbf{u}) \;\|\; \mathcal{N}(\mathbf{0},\mathbf{I})\right).
 \]
-The final loss is
+A small residual penalty discourages unnecessary deviations from the prior:
 \[
-\mathcal{L} = \mathcal{L}_{\mathrm{rec}} + \mathcal{L}_{\mathrm{KL}}.
+\mathcal{L}_{\mathrm{res}} =
+\frac{1}{T}\sum_{t=1}^{T}(\hat{x}^{(z)}_t - p^{(z)}_t)^2.
 \]
-This objective balances faithful reconstruction on observed points with a smooth and regular latent space that supports generalisation to unseen missingness patterns.
+The final objective is
+\[
+\mathcal{L} =
+\mathcal{L}_{\mathrm{rec}}
++ \beta \mathcal{L}_{\mathrm{KL}}
++ \lambda \mathcal{L}_{\mathrm{res}}.
+\]
+The KL coefficient $\beta$ is warmed up gradually during training. This prevents the KL term from dominating too early and allows the reconstruction pathway to learn a useful representation first.
 
-\section{Training Strategy (Gradient Descent in Practice)}
-Training is performed using gradient-based optimisation with backpropagation through time. While it is possible to train on the full sequence as a single batch, long sequences can be memory-intensive and may lead to unstable gradients. We therefore adopt a mini-batch strategy based on sliding windows.
+\section{Training Strategy}
+The model is trained with mini-batch gradient descent on sliding windows. The implementation uses windows of length $T=96$, stride $16$, and batch size $128$. The residual LSTM-VAE uses one LSTM layer, hidden dimension $48$, and latent dimension $12$. AdamW is used with learning rate $2\times 10^{-3}$ and weight decay. A ReduceLROnPlateau scheduler lowers the learning rate if the loss stops improving, and gradient clipping is applied to stabilise recurrent training.
 
-\subsection{Windowed Mini-batch Training}
-We create a dataset of overlapping windows of length $T$ (e.g., $T=48$ samples), extracted from the full series with a configurable stride. Each training example consists of the two-channel input window, the corresponding ground truth temperature window, and the mask window. Mini-batches of these windows are shuffled and fed to the model during training. This design yields several benefits: it reduces memory requirements, increases the number of training examples, and provides stochasticity in gradient updates, which often improves convergence and generalisation.
-
-\subsection{Optimiser, Scheduling, and Gradient Clipping}
-We use the AdamW optimiser, which is an adaptive gradient method with decoupled weight decay. AdamW is commonly effective for deep sequence models and objectives with noisy gradients (as in VAEs due to latent sampling). To improve training stability and convergence, we incorporate two additional techniques. First, we apply gradient clipping to the global norm of the model gradients, which mitigates exploding gradients in recurrent networks. Second, we employ a learning-rate scheduler that reduces the learning rate when the loss plateaus (ReduceLROnPlateau). Together, these choices make training more robust across different window lengths and missingness patterns.
+Training is performed on masked windows generated from the full sequence. The model sees the filled value, mask, prior, and calendar context, and learns to reconstruct the cleaned standardised target at observed points. The training objective is not computed at artificially missing points, so the model is not directly trained on hidden values that are reserved for evaluation.
 
 \begin{figure}[ht]
 	\centering
 	\placeholderbox{\textbf{Insert Figure: Training loss curve.}\\
-	Suggested content: plot of epoch-wise average training loss (and optionally learning rate) for the LSTM-VAE.\\
-	Purpose: demonstrates convergence behaviour and the effect of LR scheduling.}
-	\caption{Training dynamics of the LSTM-VAE under mini-batch optimisation.}
+	Suggested content: epoch-wise total loss, reconstruction loss, and learning rate.}
+	\caption{Training dynamics of the residual LSTM-VAE under mini-batch optimisation.}
 	\label{fig:training-curve}
 \end{figure}
 
 \section{Imputation and Inference Procedure}
-After training, imputation is performed by reconstructing the temperature sequence and then reading off the model predictions at the masked indices. Because the model outputs a full reconstructed sequence for each input window, we can obtain imputed values for missing points while still respecting the observed values for evaluation.
+For each missingness scenario, the appropriate prior is first constructed. The model then performs reconstruction using sliding windows. Each window returns a full residual reconstruction, and overlapping predictions are averaged to produce one reconstructed value per timestamp. This overlap-averaging reduces local variance and avoids relying on a single window boundary.
 
-\subsection{Windowed Reconstruction with Overlap Averaging}
-For long sequences, reconstructing the entire series in one forward pass can be computationally heavy. To address this, we perform inference using the same sliding-window mechanism used for training. Each window is reconstructed independently, and overlapping predictions are stitched back into a full-length reconstruction by averaging the predicted values for each time index. If an index is covered by multiple windows, the average acts as a simple ensemble that reduces variance and smooths local inconsistencies. This approach provides a scalable and memory-friendly evaluation method while preserving full-resolution predictions.
+A conservative residual gate is applied after reconstruction. A small validation mask is created from observed points, and candidate residual blend weights are tested. The neural residual is used only when validation improves both MAE and RMSE over the prior. For MIDDLE and RANDOM missingness, the implementation keeps the prior unchanged because interpolation is already the strongest and most stable choice for those gap structures. For START and END missingness, the residual correction is allowed when the validation check supports it.
+
+The final imputed series preserves all observed raw values and replaces only missing positions with the hybrid model prediction:
+\[
+x^{\mathrm{imp}}_t =
+\begin{cases}
+x_t, & m_t=1,\\
+\hat{x}_t, & m_t=0.
+\end{cases}
+\]
 
 \begin{figure}[ht]
 	\centering
 	\placeholderbox{\textbf{Insert Figure: Windowed reconstruction stitching.}\\
-	Suggested content: diagram illustrating overlapping windows over the timeline and how their predictions are averaged into one final reconstructed series.\\
-	Purpose: clarifies how window-based inference produces a single global reconstruction.}
-	\caption{Windowed inference and overlap-averaging used to stitch reconstructions into a full-length imputed series.}
+	Suggested content: overlapping windows over the timeline and averaging of predictions into one final imputed series.}
+	\caption{Windowed inference and overlap-averaging used to stitch reconstructions into a full-length imputation.}
 	\label{fig:window-stitching}
 \end{figure}
 
 \section{Evaluation Protocol}
-Evaluation focuses on the imputation task rather than general reconstruction. For this reason, we compute error metrics only at indices where $m_t=0$ (i.e., values that were marked missing either randomly, at boundaries, or via outlier detection). This prevents methods from being unfairly rewarded for simply reproducing observed values.
+Evaluation is performed only at masked positions. For a given mask, let $\mathcal{M}=\{t:m_t=0\}$ be the set of hidden indices. Mean Absolute Error is computed as
+\[
+\mathrm{MAE} =
+\frac{1}{|\mathcal{M}|}\sum_{t\in\mathcal{M}}
+\left|\hat{x}_t - x_t\right|,
+\]
+and Root Mean Squared Error is computed as
+\[
+\mathrm{RMSE} =
+\sqrt{
+\frac{1}{|\mathcal{M}|}\sum_{t\in\mathcal{M}}
+\left(\hat{x}_t - x_t\right)^2
+}.
+\]
 
-We report Mean Absolute Error (MAE) and Root Mean Squared Error (RMSE), which capture complementary aspects of imputation quality. MAE measures the average absolute deviation and is robust to occasional large errors, while RMSE penalises larger deviations more strongly. By reporting both metrics, we provide a balanced picture of typical error and sensitivity to larger mistakes.
+In addition to reporting MAE and RMSE for each method, the implementation computes a baseline win rate. For every baseline and every missingness position, the hybrid model receives one win for MAE if its MAE is lower, and one win for RMSE if its RMSE is lower. This gives a compact measure of how often the proposed method improves over the collection of baselines.
+
+\section{Visual and Runtime Comparison}
+The evaluation includes qualitative plots for each missingness scenario. For START, MIDDLE, END, and RANDOM, the plotted segment shows the ground truth, observed values, selected baselines, and the hybrid LSTM-VAE imputation. These plots are used to check whether lower error values correspond to visually plausible reconstructions.
+
+Runtime is measured separately from training. The recorded time covers only the imputation procedure: building the imputed output for the method under a fixed mask. For the hybrid model, this includes prior construction, windowed neural reconstruction, overlap averaging, and residual gating. For baselines, it includes only the corresponding baseline imputation operation. This makes the timing comparison focused on deployment-time imputation cost rather than model fitting.
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Ground truth vs. imputed series (zoomed segment).}\\
-	Suggested content: zoomed plot showing ground truth temperature, masked observations, and the LSTM-VAE reconstruction over a challenging interval with missing/outlier points.\\
-	Purpose: qualitative validation that the imputation is plausible and temporally consistent.}
-	\caption{Qualitative comparison of ground truth and LSTM-VAE imputation on a representative masked segment.}
+	\placeholderbox{\textbf{Insert Figure: Method comparison by missingness scenario.}\\
+	Suggested content: four plots comparing ground truth, selected baselines, and hybrid LSTM-VAE for START, MIDDLE, END, and RANDOM.}
+	\caption{Qualitative comparison of hybrid LSTM-VAE imputation against baseline methods.}
 	\label{fig:qualitative-imputation}
 \end{figure}
 
-\section{Implementation and Reproducibility Details}
-All experiments are implemented in Python using NumPy and Pandas for data manipulation and PyTorch for deep learning. To support reproducibility, we fix the random seed used for generating the missingness mask and we retain the same mask when comparing baseline and LSTM-VAE methods. The implementation records key hyperparameters such as missingness rate, outlier threshold, rolling window length, LSTM hidden size, latent dimensionality, window length, batch size, and optimiser settings.
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: Imputation-only runtime comparison.}\\
+	Suggested content: bar chart showing runtime in seconds for the hybrid model and baselines under each missingness scenario.}
+	\caption{Imputation-only runtime comparison across methods and missingness scenarios.}
+	\label{fig:runtime-comparison}
+\end{figure}
 
-After training, model parameters and optimiser state are saved to disk to enable later reuse and to support ablation studies. Saving both the model and optimiser is useful when training needs to be resumed or when additional evaluation settings are explored without retraining from scratch.
+\section{Implementation and Reproducibility Details}
+All experiments are implemented in Python using NumPy and Pandas for data manipulation, scikit-learn for KNN and baseline utilities, and PyTorch for the residual LSTM-VAE. A fixed random seed is used for missingness generation and sampling baselines. The implementation records the missingness rate, mask type, standardisation statistics, sequence length, stride, batch size, hidden dimension, latent dimension, optimiser settings, and residual blend weights.
+
+After training, the model checkpoint is saved with the model parameters, optimiser state, standardisation parameters, and key architecture settings. This allows the same model configuration to be reused for later evaluation or thesis figure generation.
 
 \section{Chapter Summary}
-This chapter presented the complete methodology for time-series imputation in this thesis, including dataset selection, preprocessing, missingness and outlier modelling, baseline methods, and the proposed LSTM-VAE approach. It also described the objective function, the mini-batch training strategy based on sliding windows, and the windowed reconstruction procedure used for efficient inference on long sequences. The next chapter reports experimental results and compares the performance of baselines and the proposed model under the defined evaluation protocol.
-
-
+This chapter presented the methodology used to compare baseline imputation methods with the proposed hybrid residual LSTM-VAE. The method combines deterministic priors with a neural residual model, uses standardised and calendar-aware inputs, evaluates four missingness scenarios, and reports masked-point MAE, RMSE, baseline win rate, visual comparisons, and imputation-only runtime. The next chapter reports and interprets the empirical results produced by this protocol.
