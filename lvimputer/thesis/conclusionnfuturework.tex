@@ -7,62 +7,247 @@
 \label{ch:conclusion-future-work}
 
 \section{Chapter Overview}
-\subsection{Purpose of the chapter}
-\subsection{Connection to the research aim}
-\subsection{Summary of chapter organisation}
+
+This chapter closes the thesis by drawing together the main findings, reflecting on the research objectives, and identifying directions for future work. The study began with a practical problem: IoT sensor data are often incomplete, and the choice of imputation method can change the quality of everything that follows. A missing temperature reading may look harmless on its own. In a long monitoring series, though, repeated gaps can affect forecasting, anomaly detection, calibration, reporting, and visual interpretation. The thesis addressed that problem by building and evaluating a hybrid residual LSTM-VAE for temperature-sensor imputation.
+
+The chapter does not simply repeat the results from Chapter~\ref{ch:results-discussion}. Instead, it interprets what those results suggest. The proposed method performed strongly in the controlled experiment, but the most useful lesson is a bit more nuanced than "the deep model won." The winning approach was a hybrid one. It used deterministic priors, residual sequence modelling, and a conservative gate that avoided unnecessary neural corrections. That design choice matters because, in some missingness settings, a simple prior was already very good.
+
+The rest of the chapter is organised around six concerns. First, it summarises the study and its main findings. Second, it revisits the research objectives and explains how they were addressed. Third, it outlines the contributions of the work. Fourth, it discusses the implications for sensor-data imputation. Fifth, it restates the limitations in a more reflective way. Finally, it proposes future work that could extend the current implementation into a broader, more realistic imputation framework.
 
 \section{Summary of the Study}
+
 \subsection{Research problem revisited}
-\subsection{Overview of the dataset and missingness scenarios}
-\subsection{Overview of the baseline methods}
-\subsection{Overview of the proposed hybrid residual LSTM-VAE}
+
+The central problem examined in this thesis was missing-data imputation in IoT sensor time series. The work focused on temperature readings because temperature is common in environmental and IoT monitoring, and because it often has enough temporal structure to make imputation meaningful. At the same time, temperature is not a trivial signal. It may be smooth for long periods, then shift because of weather, heating or cooling cycles, sensor placement, or device behaviour. A method that simply flattens the missing region can look reasonable from a distance while still missing the local shape of the series.
+
+The thesis treated missingness as more than a single random event. That was important. A method can perform well when missing points are scattered across the sequence but fail when an entire block is missing at the beginning or end. The practical world looks more like this mixed picture. A sensor might lose a few packets, restart after a power dip, stop reporting during maintenance, or begin recording only after a deployment delay. Those situations do not all ask the same question of an imputer.
+
+The study also recognised that deep learning methods should not be accepted just because they sound more advanced. In sensor time series, simple baselines can be surprisingly strong. Linear interpolation, for example, can be hard to beat when a temperature curve is smooth and the missing point has observed neighbours on both sides. For that reason, the proposed LSTM-VAE was evaluated against both statistical/time-aware baselines and machine-learning baselines, using the same masks and the same evaluation metrics.
+
+\subsection{Overview of the experimental workflow}
+
+The experiment used a real temperature dataset containing 26,387 timestamped readings. The data were sorted chronologically and treated as a univariate time series. Synthetic missingness was introduced into the series at a fixed missing rate of 30\%. Four missingness scenarios were used: START, MIDDLE, END, and RANDOM. Each scenario removed 7,916 values, leaving the original values available as ground truth for evaluation.
+
+The statistical and time-aware baselines included mean, median, mode, random sampling, hot-deck sampling, LOCF, LOCB, forward fill, and linear interpolation. The machine-learning baselines included KNN regression, ridge regression, histogram gradient boosting, and an IterativeImputer with Bayesian Ridge. These methods were included because they represent realistic alternatives that a researcher or practitioner might try before adopting a neural model.
+
+The proposed model was a hybrid residual LSTM-VAE. Rather than asking the neural network to generate missing temperature values from zero-filled gaps, the method first constructed a deterministic prior. Interpolation was used for MIDDLE and RANDOM missingness, where local neighbouring observations were available. Seasonal KNN was used for START and END missingness, where ordinary interpolation did not have context on both sides. The LSTM-VAE then learned residual corrections around this prior. A residual gate was applied during inference, so the neural correction was used only when validation behaviour suggested that it helped.
 
 \section{Summary of Key Findings}
-\subsection{Performance under START missingness}
-\subsection{Performance under MIDDLE missingness}
-\subsection{Performance under END missingness}
-\subsection{Performance under RANDOM missingness}
-\subsection{Overall comparison with statistical baselines}
-\subsection{Overall comparison with machine-learning baselines}
-\subsection{Runtime and practical cost}
+
+\subsection{Overall performance}
+
+The proposed hybrid method achieved the best reported performance across all missingness scenarios and all baseline groups. Against the statistical/time-aware baselines, it achieved a win rate of 72 out of 72 comparisons. This means it had lower MAE and lower RMSE than each of the nine statistical/time-aware baselines under all four missingness scenarios. Against the machine-learning baselines, it achieved a win rate of 32 out of 32 comparisons. Put simply, within this experimental setup, the hybrid method was the top performer on every reported quantitative comparison.
+
+The actual error values make the result clearer. Under START missingness, the hybrid model obtained MAE 5.5709 and RMSE 8.4133. Under MIDDLE missingness, it obtained MAE 4.5137 and RMSE 5.4412. Under END missingness, it obtained MAE 5.0384 and RMSE 6.3708. Under RANDOM missingness, it obtained MAE 0.3524 and RMSE 0.8826. RANDOM missingness was much easier than the block-based scenarios, which is consistent with the expectation that scattered gaps usually leave useful local context.
+
+These results support the main claim of the thesis: a prior-guided residual LSTM-VAE can improve imputation accuracy for this IoT temperature series when evaluated against common statistical and machine-learning alternatives. The evidence is strongest because the comparison includes strong baselines, not only weak constant imputers.
+
+\subsection{Findings by missingness scenario}
+
+The START scenario showed one of the clearest improvements. The best statistical/time-aware baseline by MAE was median imputation at 9.1957, while the hybrid model achieved 5.5709. That is a reduction of about 39.4\%. The best machine-learning baseline was the IterativeImputer with MAE 9.2346, again well above the hybrid result. This suggests that the seasonal KNN prior and residual correction were especially helpful when the beginning of the series was hidden.
+
+The MIDDLE scenario was more subtle. Linear interpolation was already very close, with MAE 4.6072 compared with the hybrid model's MAE 4.5137. The improvement exists, but it is not dramatic. A careful reading may suggest that, for long internal gaps in this dataset, most of the benefit came from having a strong interpolation prior. The residual gate selected a blend weight of 0.00, which means the neural residual was not used in the final output for this scenario. That is an important result in its own right. Sometimes the best neural decision is to leave a good simple estimate alone.
+
+The END scenario sat between START and MIDDLE. The hybrid model achieved MAE 5.0384, compared with the best statistical/time-aware baseline MAE of 5.8609 and the best machine-learning baseline MAE of 5.8575. The improvement was smaller than START but still meaningful. The residual gate used a blend weight of 1.00, and the final hybrid output slightly improved over the prior-only result.
+
+The RANDOM scenario had the lowest absolute error. Linear interpolation was extremely competitive, with MAE 0.3571 compared with the hybrid model's MAE 0.3524. The difference is small, and it should not be oversold. In a practical setting where missing points are mostly scattered and short, interpolation may be enough. Still, the hybrid method did not harm the result because the gate kept the interpolation prior unchanged. Compared with the ML baselines, the hybrid method performed much better, especially against KNN and ridge regression.
+
+\subsection{Importance of the residual gate}
+
+One of the more interesting findings is the behaviour of the residual gate. The gate used the prior unchanged for MIDDLE and RANDOM missingness, where interpolation was already strong. It allowed residual correction for START and END missingness, where a boundary-aware prior was needed. This behaviour appears to be a sensible compromise.
+
+Without the gate, the neural model might have changed good interpolation estimates and increased error. With the gate, the method became cautious. It used the LSTM-VAE only when the validation check supported it. That makes the final model less like a standalone deep learning imputer and more like a controlled refinement system. The result may be less glamorous, but it is arguably more useful.
+
+The prior-only comparison also shows that the deterministic prior carried much of the performance. For START, the prior MAE was 5.5717 and the final hybrid MAE was 5.5709. For END, the prior MAE was 5.0423 and the final hybrid MAE was 5.0384. These differences are small. The model's advantage over ordinary baselines comes largely from the whole hybrid design: choosing the right prior, using temporal features, learning residuals, and gating the correction. The LSTM-VAE is part of the answer, not the entire answer.
+
+\subsection{Runtime findings}
+
+The runtime comparison showed a practical trade-off. Simple statistical methods were extremely fast. Linear interpolation, mean imputation, median imputation, and fill-based methods required only fractions of a second. The hybrid method was slower than those methods, especially for START and END missingness, where imputation took around two seconds. Even so, the hybrid method was much faster than the IterativeImputer, which took roughly 25 to 30 seconds per scenario.
+
+For an offline analysis, the hybrid runtime appears acceptable. For a live edge deployment, it may need further work. A building sensor gateway, for instance, might be able to spend a second or two reconstructing a batch of missing readings overnight, but the same cost may be less acceptable if imputation has to happen every few seconds on a small device. This distinction should guide future implementation work.
 
 \section{Response to Research Objectives}
-\subsection{Objective 1: Data preparation and masking pipeline}
-\subsection{Objective 2: Baseline comparison}
-\subsection{Objective 3: Hybrid LSTM-VAE implementation}
-\subsection{Objective 4: Quantitative and visual evaluation}
-\subsection{Objective 5: Runtime assessment}
+
+\subsection{Objective 1: Prepare a reproducible data pipeline}
+
+The first objective was to prepare a reproducible pipeline for loading, sorting, cleaning, and masking the sensor data. This was achieved. The dataset was loaded from \texttt{data/dataset1.csv}, the datetime column was parsed, and the readings were sorted chronologically. A training-only cleanup step was used to reduce the influence of extreme artefacts during neural model fitting, while the original raw values remained the reference values for evaluation.
+
+The use of fixed random seeds and defined masking functions also supports reproducibility. Each missingness scenario can be recreated, and the same hidden positions are used across methods. That consistency is essential in imputation research because even small changes in the mask can change the reported error.
+
+\subsection{Objective 2: Construct multiple missingness scenarios}
+
+The second objective was to construct missingness scenarios representing boundary, internal-block, and random gaps. This was also achieved. START, MIDDLE, END, and RANDOM masks were created at a 30\% missing rate. Each scenario tested a different kind of imputation difficulty.
+
+The results confirmed that this design was useful. RANDOM missingness was much easier than the other cases. START missingness exposed the weakness of interpolation and fill-based approaches at the beginning of a sequence. MIDDLE missingness showed how competitive interpolation can be when both sides of the gap are available. END missingness showed that boundary gaps are not all identical. These differences would have been hidden if the study had used only one random mask.
+
+\subsection{Objective 3: Compare statistical and machine-learning baselines}
+
+The third objective was to compare standard statistical imputers with machine-learning baselines under the same missingness patterns. This was met through two baseline groups. The statistical/time-aware group included constant, sampling, fill-based, and interpolation methods. The machine-learning group included KNN regression, ridge regression, histogram gradient boosting, and IterativeImputer with Bayesian Ridge.
+
+The baseline comparison helped keep the proposed model honest. Linear interpolation came close to the hybrid method for MIDDLE and RANDOM missingness. IterativeImputer was the strongest ML baseline and was reasonably competitive for END missingness. These results make the final claim stronger because the proposed method was not compared only with weak baselines.
+
+\subsection{Objective 4: Implement a hybrid residual LSTM-VAE}
+
+The fourth objective was to implement a hybrid residual LSTM-VAE that combines deterministic priors with sequence-based residual learning. This objective was achieved in the main PyTorch notebook. The model used standardised inputs, observation masks, prior values, and calendar features. It was trained on sliding windows and used an LSTM encoder/decoder structure with a VAE-style latent representation.
+
+The implemented model differs from a raw LSTM-VAE in an important way. It does not generate the full signal from scratch. It predicts residuals around a prior. This design appears to be well matched to the temperature-imputation task because the priors already capture much of the broad temporal structure. The residual model then has a narrower job: correct the prior where useful and stay out of the way where it is not.
+
+\subsection{Objective 5: Evaluate quantitative accuracy and visual plausibility}
+
+The fifth objective was to evaluate the methods using masked-point MAE, RMSE, and visual comparisons. The quantitative part was completed through MAE and RMSE tables for all methods and all masks. The visual part was addressed through notebook plots that compare the ground truth, observed masked values, baseline imputations, and hybrid reconstruction.
+
+The combined evaluation is useful because numerical metrics do not always tell the whole story. A method can have a low MAE while still producing a visually awkward line near a gap boundary. Conversely, a curve may look smooth but miss local extremes, which is then reflected more strongly in RMSE. Using both metrics and plots gives a more balanced view.
+
+\subsection{Objective 6: Measure imputation-only runtime}
+
+The final objective was to measure imputation-only runtime so that accuracy could be considered alongside computational cost. This was achieved. The timing results show that the hybrid method is slower than simple statistical baselines but far faster than the IterativeImputer. The timing comparison also makes clear that the method is more suitable for offline or batch imputation in its current form than for highly constrained real-time deployment.
 
 \section{Research Contributions}
+
 \subsection{Methodological contribution}
+
+The main methodological contribution is the controlled comparison framework. The thesis evaluates multiple methods using the same dataset, the same missingness masks, the same hidden points, and the same metrics. This reduces the chance that a method looks better because it was tested under easier conditions. It also separates missingness by pattern rather than treating all missing values as one generic condition.
+
+Another contribution is the hybrid residual design. The proposed approach combines interpolation, seasonal KNN, LSTM-VAE residual modelling, and validation-based gating. The result suggests that a neural model can be more useful when it refines a strong prior instead of replacing it. That idea may be valuable for other smooth sensor signals as well, though it would need to be tested.
+
 \subsection{Practical contribution}
+
+The practical contribution is a reproducible workflow for IoT temperature imputation. The notebooks show how to clean training inputs, generate masks, run simple baselines, run ML baselines, train the hybrid model, evaluate masked-point errors, compute win rates, and measure imputation-only runtime. A practitioner could adapt this structure to another sensor dataset without redesigning the whole evaluation from scratch.
+
+The results also provide a practical warning. If missingness is random and scattered, simple interpolation may be very hard to beat in absolute terms. If missingness occurs at the start or end of the sequence, local interpolation and fill-based methods may perform poorly. This distinction can help practitioners choose methods based on the type of gaps they actually see, not only on the method name.
+
 \subsection{Contribution to IoT sensor imputation research}
 
+For IoT sensor imputation research, the thesis contributes a focused case study of prior-guided deep imputation. It does not claim broad universality. Instead, it shows that a hybrid residual LSTM-VAE can outperform a meaningful set of baselines on a real temperature series under controlled missingness scenarios.
+
+The study also highlights the value of reporting prior-only results. Without the prior-only comparison, it would be easy to assume that the LSTM-VAE itself caused the full improvement. The actual result is more nuanced. The prior is doing a lot. The residual model and gate add selective refinement. That kind of transparency is useful because it makes the model's behaviour easier to understand and harder to exaggerate.
+
 \section{Implications of the Findings}
+
 \subsection{Implications for sensor-data preprocessing}
+
+The findings suggest that preprocessing decisions should be treated as part of the model, not as a background detail. Sorting by timestamp, handling extreme artefacts, choosing missingness masks, and selecting priors all shape the final results. In this study, the training-only cleanup step helped the neural model avoid learning from sentinel-like values, while raw-target evaluation preserved fairness.
+
+For sensor-data workflows, this may suggest a two-track view of data quality. One track prepares a cleaner signal for training. The other preserves the original values for evaluation and reporting. Keeping those tracks separate avoids a common trap: making the evaluation easier without saying so.
+
 \subsection{Implications for baseline selection}
+
+The baseline results reinforce a simple but sometimes neglected point: strong baselines matter. Linear interpolation was very competitive for MIDDLE and RANDOM missingness. IterativeImputer was the strongest ML baseline in several settings. If the proposed model had been compared only with mean, median, or mode imputation, the result would have looked impressive but less informative.
+
+Future imputation studies should include methods that are plausible for the signal type. For a smooth temperature series, interpolation is not a weak baseline. It is one of the first methods a reasonable analyst would try. For datasets with strong daily or seasonal structure, seasonal matching may also be a serious competitor.
+
 \subsection{Implications for hybrid deep-learning imputation}
+
+The results suggest that hybrid deep-learning imputation may be most useful when it is designed with restraint. A neural model does not always need to overwrite a good deterministic estimate. It may be better to learn residual corrections and apply them selectively. This is especially true for sensor data where physical continuity and seasonal repetition already provide strong clues.
+
+There is also a modelling lesson here. More model capacity is not automatically better. In MIDDLE and RANDOM missingness, the gate chose not to use the learned residual. That choice protected the result. A less cautious model might have produced a more "neural" reconstruction but a worse imputation.
+
 \subsection{Implications for deployment and runtime decisions}
 
+The runtime results suggest that the current hybrid model is feasible for offline or batch imputation, but it is not yet a lightweight edge solution. If a monitoring station uploads data every night and the analyst wants to reconstruct gaps before reporting, the method appears reasonable. If a microcontroller needs to fill values instantly while running on a small battery, the current setup would probably need simplification.
+
+This does not make the model impractical. It simply defines the deployment context more honestly. The current work is a modelling and evaluation study. Turning it into a field-ready tool would require attention to memory, latency, update frequency, and failure handling.
+
 \section{Limitations Revisited}
+
 \subsection{Single-sensor limitation}
+
+The study uses one temperature channel. This keeps the experiment interpretable, but it limits generalisation. Many IoT systems collect several variables at once. Humidity, light, voltage, and nearby sensor readings could all help impute temperature. By excluding these variables, the thesis focuses on univariate temporal structure. That is useful for isolating the method, but it leaves multivariate recovery unexplored.
+
 \subsection{Synthetic missingness limitation}
+
+The experiment uses synthetic masks. This makes evaluation possible because the hidden values are known. Real missingness, though, may not behave like synthetic START, MIDDLE, END, or RANDOM masks. A sensor may fail during heat, rain, power instability, or network congestion. If the failure is related to the true value, imputation becomes more difficult and the evaluation may change.
+
+The synthetic masks are still valuable. They reveal how methods behave under controlled gap structures. They should not be treated as a perfect substitute for real missing events.
+
 \subsection{Offline evaluation limitation}
+
+The pipeline is offline. The dataset is available before imputation, the model can use broad sequence context, and evaluation is performed after reconstruction. A live system would be different. Future readings might not be available. The model might need to update incrementally. The device might have memory or power limits. These deployment concerns are outside the current scope.
+
 \subsection{Model and baseline configuration limitation}
 
+The reported findings depend on the chosen model settings, baseline settings, and feature construction. The LSTM-VAE uses a sequence length of 96, hidden dimension 48, and latent dimension 12. The ML baselines use 48 lagged values and lagged mask indicators. Different choices may produce different results. The current configuration is reasonable and aligned with the implementation, but it is not the only possible setup.
+
+One smaller implementation detail is worth noting again. In the main hybrid notebook, random sampling and hot-deck sampling share the same sampled donor output, so their metrics are identical. If a future version wants to treat these as truly separate baselines, the sampling procedures should be separated and rerun.
+
 \section{Recommendations}
+
 \subsection{Recommendations for researchers}
+
+Researchers working on sensor imputation should evaluate more than one missingness pattern. A single random mask can hide important weaknesses. Boundary gaps and long internal blocks should be tested separately, especially for time-series data.
+
+It is also worth reporting prior-only performance when a hybrid model is used. If the prior already solves most of the problem, that should be visible. This does not weaken a hybrid method. It helps explain why it works.
+
+Baseline selection should be taken seriously. Mean and median imputation are useful lower bounds, but they are not enough. For smooth sensor signals, interpolation, fill-based methods, lag-based ML models, and iterative imputers provide a more convincing comparison.
+
 \subsection{Recommendations for IoT practitioners}
+
+For practitioners, the first recommendation is to inspect the gap pattern before choosing an imputation method. If the missing readings are isolated, linear interpolation may be accurate enough and much cheaper than a neural model. If the data contain long gaps or boundary missingness, a stronger method may be justified.
+
+Practitioners should also check plots, not only error metrics. A reconstructed curve should make physical sense. For temperature, a filled segment that jumps suddenly or stays flat for too long may be suspicious even if the average error is acceptable.
+
+Finally, runtime should be considered early. A method that is fine in a notebook may be too slow or too memory-heavy for an edge device. Batch processing and real-time deployment are different use cases.
+
 \subsection{Recommendations for future implementation}
 
+Future implementation work should package the workflow more cleanly. The notebook is useful for experimentation, but a script or module-based pipeline would be easier to rerun, test, and extend. It would also be useful to save all result tables and figures automatically so that the thesis values, plots, and code outputs stay synchronised.
+
+The baseline notebooks should also be harmonised with the main hybrid notebook. The same mask generation, sampling rules, and dataset path handling should be shared across all experiments. That would reduce small inconsistencies and make later reproduction easier.
+
 \section{Future Work}
+
 \subsection{Extension to multivariate sensor data}
+
+The most natural next step is multivariate imputation. Real IoT systems rarely collect only one variable. Temperature may be related to humidity, voltage, light, or readings from nearby sensors. A multivariate model could use these relationships to recover missing values more accurately, especially when a single channel has a long gap.
+
+This extension should be done carefully. Multivariate models can also introduce leakage if correlated variables are not handled correctly. The future pipeline would need clear rules about which variables are observed, which are missing, and which are available at imputation time.
+
 \subsection{Evaluation on additional IoT datasets}
+
+The model should be tested on additional datasets. One temperature series is useful, but it is not enough to make broad claims. Future work could evaluate the method on humidity, air-quality, smart-building, smart-grid, water-quality, or industrial sensor datasets. It would be especially helpful to include signals with different levels of smoothness. A method that works well on temperature may behave differently on a noisier or more event-driven signal.
+
 \subsection{Testing real missingness events}
+
+Synthetic masks should be complemented with real missingness events where possible. Real missingness is harder to evaluate because the true values are unknown, but there are still useful strategies. For example, one could compare imputed values around known maintenance periods, inspect agreement with neighbouring sensors, or use partially overlapping devices where one sensor continues recording while another fails.
+
+This would move the work closer to field conditions. It may also reveal failure modes that synthetic masks do not capture.
+
 \subsection{Varying missingness rates and gap lengths}
+
+The current study uses a 30\% missing rate. Future work should test lower and higher rates, such as 10\%, 20\%, 40\%, and 50\%. Gap length should also be varied. A single long block is not the same as several shorter blocks. A few scattered missing points are not the same as a missing hour or a missing week.
+
+Testing these settings would help identify when the hybrid model is worth the extra cost. It may turn out that interpolation is enough below a certain gap length, while the hybrid method becomes more useful after the local context breaks down.
+
 \subsection{Online and streaming imputation}
+
+Another useful extension is online imputation. In the current setup, the full sequence is available. A streaming system would have to impute values as data arrive, often without future observations. This changes the problem. MIDDLE-style imputation with both left and right context may not be possible in real time.
+
+Future work could adapt the method into a causal or semi-causal version. For example, a gateway could use recent history, calendar features, and seasonal memory to fill missing values immediately, then revise the imputation later when future observations arrive.
+
 \subsection{Edge-device deployment and optimisation}
+
+The model could also be tested under edge-device constraints. This would involve measuring memory use, CPU time, energy cost, and latency on hardware closer to a real IoT gateway. The LSTM-VAE could be simplified, quantised, or distilled into a smaller model. The seasonal KNN prior might also need faster indexing if it is used on long histories.
+
+This line of work would answer a practical question: can the method run where sensor data are actually collected, or is it better suited to cloud or offline processing?
+
 \subsection{Uncertainty estimation for imputed values}
+
+Future work could attach uncertainty estimates to the imputed values. Not all imputations are equally reliable. A single missing point between two observed readings is usually less uncertain than the first week of a missing sequence. Since the model has a VAE component, there may be room to estimate uncertainty through latent sampling or predictive intervals.
+
+This would make the completed dataset more informative. Downstream systems could treat high-confidence and low-confidence imputations differently. For example, a report could flag a long reconstructed segment rather than displaying it as if it were directly measured.
+
 \subsection{Comparison with newer generative models}
 
+The thesis focuses on a residual LSTM-VAE, but newer generative methods could also be compared. Diffusion-based imputers, transformer-based models, and attention-heavy architectures may offer better reconstructions in some settings. They may also require more data, more computation, and more careful tuning.
+
+A future comparison should keep the same discipline used in this thesis: shared masks, strong baselines, masked-point metrics, visual inspection, and runtime reporting. Otherwise, a more complex model may look better simply because the comparison is easier.
+
 \section{Final Conclusion}
+
+This thesis set out to examine whether a hybrid residual LSTM-VAE could improve missing-data imputation for an IoT temperature series. The results show that it can, at least under the controlled setting studied here. The proposed method outperformed the statistical/time-aware baselines and the machine-learning baselines across all four missingness scenarios and both error metrics.
+
+The stronger lesson is a little more grounded. The model worked well because it did not try to be clever everywhere. It used interpolation when interpolation was suitable. It used seasonal KNN when boundary context was missing. It learned residual corrections, then applied them cautiously. That combination produced accurate reconstructions without ignoring the strength of simpler methods.
+
+The work also shows why imputation should be evaluated by gap type. RANDOM missingness, MIDDLE blocks, START gaps, and END gaps behave differently. A single headline error value would have hidden that. By separating the scenarios, the thesis gives a clearer picture of where the hybrid model adds value and where simpler methods remain close.
+
+The study is not the final word on IoT imputation. It is a focused contribution: one dataset, one temperature channel, one controlled evaluation framework, and one hybrid model. Still, the findings are useful. They suggest that prior-guided residual sequence modelling is a promising direction for sensor-data imputation, especially when it is tested fairly against methods that are simple, fast, and genuinely competitive.
