@@ -7,52 +7,500 @@
 \label{ch:results-discussion}
 
 \section{Chapter Overview}
-\subsection{Purpose of the evaluation}
-\subsection{Methods compared in this chapter}
-\subsection{Metrics used for analysis}
+
+This chapter presents the results obtained from the missing-data imputation experiments described in Chapter~\ref{ch:methodology}. The main purpose is to compare the proposed hybrid residual LSTM-VAE with two groups of baselines: simple statistical/time-aware imputers and lag-based machine-learning imputers. The comparison is made under four controlled missingness patterns: \texttt{START}, \texttt{MIDDLE}, \texttt{END}, and \texttt{RANDOM}. Each pattern hides 30\% of the same temperature sequence, and the imputation error is calculated only at the hidden positions.
+
+The results are fairly direct, but they deserve a careful reading. The hybrid model records the lowest MAE and RMSE in every reported comparison. It wins against the statistical/time-aware baselines in 72 out of 72 metric comparisons and against the machine-learning baselines in 32 out of 32 metric comparisons. That looks strong, and it is. Still, the reason for the result is not simply that an LSTM-VAE was trained. The method performs well because it combines a good deterministic prior with a cautious residual model. For \texttt{MIDDLE} and \texttt{RANDOM} gaps, the residual gate keeps the interpolation prior unchanged. For \texttt{START} and \texttt{END} gaps, the learned residual is allowed to adjust the seasonal KNN prior. This makes the final method less flashy than a pure neural reconstruction, but it is probably more sensible for this temperature series.
+
+The chapter is organised as follows. Section~\ref{sec:results-setting} recaps the experimental setting. Section~\ref{sec:baseline-results} reports the statistical and machine-learning baseline results. Section~\ref{sec:lstm-vae-results} presents the proposed model results and compares them with the prior-only estimates. Section~\ref{sec:visual-results} identifies the figures that should be inserted from the notebooks. Section~\ref{sec:quantitative-comparison} brings the quantitative results together. Section~\ref{sec:discussion} interprets the findings, including the cases where simple methods came close. Section~\ref{sec:results-limitations} discusses the main limitations.
 
 \section{Experimental Setting}
+\label{sec:results-setting}
+
 \subsection{Dataset and preprocessing recap}
+
+The experiment uses the timestamped temperature series in \texttt{data/dataset1.csv}. After chronological sorting, the dataset contains 26,387 readings from 18 August 2016 10:55 to 18 December 2017 08:25. The model is trained and evaluated on a single temperature channel. That single-channel design is important because it means the results come from temporal structure within the series, not from neighbouring sensors or correlated variables.
+
+The implementation applies a training-only cleanup step before fitting the neural model. In particular, 139 out of 26,387 points are treated as extreme training artefacts using a rolling median/MAD rule and a low sentinel threshold. These cleaned values stabilise model training, but the reported MAE and RMSE are still computed against the original raw temperature values at the artificially hidden positions. This separation matters. Without it, the model could appear better simply because the target was made easier. Here, the test target remains the original series.
+
+\begin{table}[ht]
+	\centering
+	\small
+	\begin{tabular}{p{0.48\linewidth}p{0.38\linewidth}}
+		\toprule
+		\textbf{Item} & \textbf{Value} \\
+		\midrule
+		Dataset & \texttt{data/dataset1.csv} \\
+		Temperature readings & 26,387 \\
+		Date range & 18 Aug. 2016 10:55 to 18 Dec. 2017 08:25 \\
+		Channel evaluated & Temperature \\
+		Missingness rate & 30\% \\
+		Masked points per scenario & 7,916 \\
+		Training-only cleaned outliers & 139 \\
+		Standardisation mean & 11.2585 \\
+		Standardisation standard deviation & 8.4300 \\
+		\bottomrule
+	\end{tabular}
+	\caption{Dataset and preprocessing summary for the results reported in this chapter.}
+	\label{tab:results-dataset-summary}
+\end{table}
+
 \subsection{Missingness and masking protocol}
-\subsection{Train, validation, and test configuration}
-\subsection{Implementation details for baseline methods}
+
+The same missingness protocol is used for all methods. Four masks are created, each hiding 7,916 points. In \texttt{START}, the first 30\% of the sequence is hidden. In \texttt{MIDDLE}, a continuous block in the middle is hidden. In \texttt{END}, the final 30\% is hidden. In \texttt{RANDOM}, 30\% of the indices are selected randomly using the fixed seed.
+
+The four masks are not equally difficult. \texttt{RANDOM} is the easiest because most missing values still have nearby observed neighbours. \texttt{MIDDLE} is harder because the missing region is a long block, but it still has context on both sides. \texttt{START} and \texttt{END} are the most awkward because one side of the local context is absent. This distinction is visible in the results: interpolation nearly matches the hybrid model for \texttt{MIDDLE} and \texttt{RANDOM}, while it performs poorly when used at the start of the sequence.
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: Missingness positions.}\\
+	Use the four-panel mask plot from the notebook or regenerate it from the current masks. The figure should show \texttt{START}, \texttt{MIDDLE}, \texttt{END}, and \texttt{RANDOM} missingness over the same temperature sequence.}
+	\caption{Synthetic missingness scenarios used for evaluation.}
+	\label{fig:results-missingness-scenarios}
+\end{figure}
+
+\subsection{Model and training configuration}
+
+The residual LSTM-VAE is trained on sliding windows of length 96 with stride 16. The input feature vector has 10 dimensions: filled value, observation mask, prior value, and calendar features. The model uses one LSTM layer, hidden dimension 48, and latent dimension 12. Training is performed for 40 epochs on CPU using AdamW with learning rate $2\times10^{-3}$, weight decay $1\times10^{-4}$, gradient clipping, and KL warm-up.
+
+The printed training loss becomes very small early in training and stays low through epoch 40. This should not be over-interpreted as proof that the model has solved imputation by itself. The model is learning residuals around a strong prior, and many observed points are already close to the prior. So a small reconstruction loss is expected. The more meaningful test is whether the final imputed values improve masked-point MAE and RMSE compared with the baselines.
+
+\begin{table}[ht]
+	\centering
+	\small
+	\begin{tabular}{lr}
+		\toprule
+		\textbf{Configuration item} & \textbf{Value} \\
+		\midrule
+		Input feature dimension & 10 \\
+		Sequence length & 96 \\
+		Training stride & 16 \\
+		Evaluation stride & 48 \\
+		Training windows & 1,645 \\
+		Batch size & 128 \\
+		LSTM layers & 1 \\
+		Hidden dimension & 48 \\
+		Latent dimension & 12 \\
+		Epochs & 40 \\
+		Training device & CPU \\
+		Optimiser & AdamW \\
+		Learning rate & $2\times10^{-3}$ \\
+		Maximum KL coefficient & $2\times10^{-3}$ \\
+		\bottomrule
+	\end{tabular}
+	\caption{Residual LSTM-VAE configuration used for the reported experiment.}
+	\label{tab:results-model-config}
+\end{table}
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: Training loss curve.}\\
+	Use the residual LSTM-VAE training plot showing total loss, reconstruction loss, and learning rate over 40 epochs.}
+	\caption{Training loss curve for the residual LSTM-VAE.}
+	\label{fig:results-training-loss}
+\end{figure}
 
 \section{Baseline Results}
-\subsection{Statistical baselines}
-\subsection{Machine learning baselines}
-\subsection{Error comparison on masked points}
-\subsection{Behaviour on short and long gaps}
+\label{sec:baseline-results}
+
+\subsection{Statistical and time-aware baselines}
+
+The first comparison group contains mean, median, mode, random sampling, hot-deck sampling, LOCF, LOCB, forward fill, and linear interpolation. These methods provide a useful spread: some ignore time completely, while others use the order of the sequence. The results show why this mix is necessary. Constant methods are poor for random gaps because they ignore local continuity. Time-aware methods are much stronger for \texttt{RANDOM} and \texttt{MIDDLE} missingness. At the same time, interpolation and carry-forward methods become weak at the \texttt{START} boundary, where they do not have enough local context.
+
+Table~\ref{tab:stat-mae-results} reports MAE, and Table~\ref{tab:stat-rmse-results} reports RMSE. Lower values are better. The hybrid LSTM-VAE gives the best result in every column. The size of the improvement, however, changes by mask type. For \texttt{START}, the best non-hybrid MAE is 9.1957 from median imputation, while the hybrid model obtains 5.5709. That is a large improvement. For \texttt{MIDDLE}, linear interpolation is already very close: 4.6072 compared with the hybrid result of 4.5137. The same pattern appears for \texttt{RANDOM}, where interpolation obtains 0.3571 and the hybrid model obtains 0.3524. In those two cases, the result is less about the neural model overpowering interpolation and more about the hybrid design refusing to damage a good prior.
+
+\begin{table}[ht]
+	\centering
+	\small
+	\begin{tabular}{lrrrr}
+		\toprule
+		\textbf{Method} & \textbf{START} & \textbf{MIDDLE} & \textbf{END} & \textbf{RANDOM} \\
+		\midrule
+		\textbf{Hybrid LSTM-VAE} & \textbf{5.5709} & \textbf{4.5137} & \textbf{5.0384} & \textbf{0.3524} \\
+		Mean & 9.2347 & 7.0395 & 5.8609 & 7.3714 \\
+		Median & 9.1957 & 6.6843 & 6.3201 & 7.2299 \\
+		Mode & 11.0104 & 6.2012 & 8.3491 & 8.6309 \\
+		Random & 10.8356 & 9.5952 & 9.5612 & 9.8093 \\
+		Hot-deck & 10.8356 & 9.5952 & 9.5612 & 9.8093 \\
+		LOCF & 13.6231 & 11.7102 & 5.9014 & 0.5226 \\
+		LOCB & 13.6231 & 12.7757 & 5.9014 & 0.5231 \\
+		Forward fill & 13.6231 & 11.7102 & 5.9014 & 0.5226 \\
+		Linear interpolation & 13.6231 & 4.6072 & 5.9014 & 0.3571 \\
+		\bottomrule
+	\end{tabular}
+	\caption{MAE comparison between the hybrid LSTM-VAE and statistical/time-aware baselines.}
+	\label{tab:stat-mae-results}
+\end{table}
+
+\begin{table}[ht]
+	\centering
+	\small
+	\begin{tabular}{lrrrr}
+		\toprule
+		\textbf{Method} & \textbf{START} & \textbf{MIDDLE} & \textbf{END} & \textbf{RANDOM} \\
+		\midrule
+		\textbf{Hybrid LSTM-VAE} & \textbf{8.4133} & \textbf{5.4412} & \textbf{6.3708} & \textbf{0.8826} \\
+		Mean & 11.5840 & 7.9770 & 6.9491 & 8.9767 \\
+		Median & 11.8297 & 7.8048 & 7.5575 & 9.1268 \\
+		Mode & 14.3724 & 7.8215 & 10.2349 & 11.4638 \\
+		Random & 13.7920 & 12.2936 & 11.9564 & 12.5566 \\
+		Hot-deck & 13.7920 & 12.2936 & 11.9564 & 12.5566 \\
+		LOCF & 16.7863 & 14.0247 & 7.1699 & 1.3634 \\
+		LOCB & 16.7863 & 14.4487 & 7.1699 & 1.2813 \\
+		Forward fill & 16.7863 & 14.0247 & 7.1699 & 1.3634 \\
+		Linear interpolation & 16.7863 & 5.5114 & 7.1699 & 0.9214 \\
+		\bottomrule
+	\end{tabular}
+	\caption{RMSE comparison between the hybrid LSTM-VAE and statistical/time-aware baselines.}
+	\label{tab:stat-rmse-results}
+\end{table}
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: Statistical baseline error comparison.}\\
+	Use the bar chart showing MAE and RMSE for the statistical/time-aware methods under \texttt{START}, \texttt{MIDDLE}, \texttt{END}, and \texttt{RANDOM}.}
+	\caption{MAE and RMSE for statistical/time-aware baselines across missingness scenarios.}
+	\label{fig:results-stat-baseline-errors}
+\end{figure}
+
+\subsection{Machine-learning baselines}
+
+The second comparison group uses lag-based machine-learning baselines: KNN regression, ridge regression, histogram gradient boosting, and an IterativeImputer with Bayesian Ridge. These baselines are stronger than simple constants because they can learn patterns from lagged values and mask indicators. They are also a useful check against overstating the value of the LSTM-VAE. If a lagged gradient-boosting model or iterative regression method performs nearly as well, the deep model's contribution would need to be described more modestly.
+
+The machine-learning results are shown in Tables~\ref{tab:ml-mae-results} and~\ref{tab:ml-rmse-results}. The IterativeImputer is the strongest non-hybrid ML method in all four missingness settings. It is especially competitive for \texttt{END}, where its MAE is 5.8575 compared with the hybrid model's 5.0384. Even there, the hybrid remains better on both metrics. For \texttt{RANDOM}, the gap is wider: the IterativeImputer obtains MAE 0.7717 and RMSE 1.6647, while the hybrid model obtains MAE 0.3524 and RMSE 0.8826.
+
+KNN and ridge regression perform poorly for the long block and boundary cases. That may look surprising at first because KNN and ridge are often reasonable baselines. In this implementation, however, they rely on 48 lagged readings and lagged mask indicators. When the hidden region is at the beginning of the series, many useful lagged values are unavailable or placeholder-filled. When the hidden region is a long block, predictions deep inside the block have weak local evidence. Gradient boosting improves on KNN and ridge in the middle and random cases, but it still does not match the hybrid model.
+
+\begin{table}[ht]
+	\centering
+	\small
+	\begin{tabular}{lrrrr}
+		\toprule
+		\textbf{Method} & \textbf{START} & \textbf{MIDDLE} & \textbf{END} & \textbf{RANDOM} \\
+		\midrule
+		\textbf{Hybrid LSTM-VAE} & \textbf{5.5709} & \textbf{4.5137} & \textbf{5.0384} & \textbf{0.3524} \\
+		KNN Regressor & 13.6231 & 14.1719 & 14.4671 & 3.2709 \\
+		Ridge Regression & 13.6231 & 14.1898 & 14.4819 & 1.7082 \\
+		HistGradientBoosting & 13.7788 & 8.1973 & 11.0963 & 0.8732 \\
+		IterativeImputer (BR) & 9.2346 & 7.0269 & 5.8575 & 0.7717 \\
+		\bottomrule
+	\end{tabular}
+	\caption{MAE comparison between the hybrid LSTM-VAE and machine-learning baselines.}
+	\label{tab:ml-mae-results}
+\end{table}
+
+\begin{table}[ht]
+	\centering
+	\small
+	\begin{tabular}{lrrrr}
+		\toprule
+		\textbf{Method} & \textbf{START} & \textbf{MIDDLE} & \textbf{END} & \textbf{RANDOM} \\
+		\midrule
+		\textbf{Hybrid LSTM-VAE} & \textbf{8.4133} & \textbf{5.4412} & \textbf{6.3708} & \textbf{0.8826} \\
+		KNN Regressor & 16.7863 & 16.0915 & 15.9828 & 4.5291 \\
+		Ridge Regression & 16.7863 & 16.1095 & 15.9893 & 2.4936 \\
+		HistGradientBoosting & 16.9188 & 11.0179 & 13.0327 & 1.8788 \\
+		IterativeImputer (BR) & 11.5841 & 7.9645 & 6.9472 & 1.6647 \\
+		\bottomrule
+	\end{tabular}
+	\caption{RMSE comparison between the hybrid LSTM-VAE and machine-learning baselines.}
+	\label{tab:ml-rmse-results}
+\end{table}
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: Machine-learning baseline error comparison.}\\
+	Use the four-panel bar chart comparing the hybrid LSTM-VAE with KNN Regressor, Ridge Regression, HistGradientBoosting, and IterativeImputer (BR).}
+	\caption{MAE and RMSE for machine-learning baselines across missingness scenarios.}
+	\label{fig:results-ml-baseline-errors}
+\end{figure}
 
 \section{LSTM-VAE Results}
-\subsection{Training dynamics and convergence}
-\subsection{Reconstruction quality on the test sequence}
-\subsection{Windowed inference and overlap stitching}
-\subsection{Observed strengths and weaknesses}
+\label{sec:lstm-vae-results}
+
+\subsection{Hybrid model results by missingness pattern}
+
+Table~\ref{tab:hybrid-main-results} summarises the proposed model's MAE and RMSE for each mask. The easiest setting is \texttt{RANDOM}, with MAE 0.3524 and RMSE 0.8826. This result is expected because scattered missing values normally leave nearby observed readings, and temperature changes smoothly over short intervals. The hardest cases are the boundary and long-block settings, where MAE ranges from 4.5137 to 5.5709.
+
+The \texttt{START} setting has the largest MAE among the hybrid results. This is not surprising. At the beginning of the sequence, the model cannot use earlier local observations, and ordinary interpolation collapses into boundary filling. The seasonal KNN prior helps by using calendar features and similar observed contexts, and the residual model makes a small additional adjustment. The \texttt{END} setting is similar, though somewhat easier in this dataset. The \texttt{MIDDLE} setting benefits from both sides of the sequence, and interpolation is already strong.
+
+\begin{table}[ht]
+	\centering
+	\small
+	\begin{tabular}{lrrrr}
+		\toprule
+		\textbf{Metric} & \textbf{START} & \textbf{MIDDLE} & \textbf{END} & \textbf{RANDOM} \\
+		\midrule
+		MAE & 5.5709 & 4.5137 & 5.0384 & 0.3524 \\
+		RMSE & 8.4133 & 5.4412 & 6.3708 & 0.8826 \\
+		\bottomrule
+	\end{tabular}
+	\caption{Hybrid residual LSTM-VAE imputation performance by missingness scenario.}
+	\label{tab:hybrid-main-results}
+\end{table}
+
+\subsection{Prior-only comparison and residual gate}
+
+The prior-only comparison is one of the most important parts of the result, because it explains what the hybrid model is actually doing. Table~\ref{tab:prior-gate-results} compares the final hybrid output with the prior before residual correction. For \texttt{MIDDLE} and \texttt{RANDOM}, the residual blend weight is 0.00. In plain terms, the validation gate decides that the neural residual should not be used, so the final output remains the interpolation prior. This is a good decision. Interpolation is already close to the ground truth in those settings, and a learned residual could easily make the curve worse.
+
+For \texttt{START} and \texttt{END}, the residual blend weight is 1.00. The model is allowed to adjust the prior, but the improvement over the prior is small: START MAE improves from 5.5717 to 5.5709, and END MAE improves from 5.0423 to 5.0384. This might seem underwhelming if one expects the LSTM-VAE to do all the work. A more careful interpretation is that the prior is already doing much of the heavy lifting, especially the seasonal KNN prior at the boundaries. The neural residual adds a small correction and, just as importantly, the gate prevents harmful correction elsewhere.
+
+\begin{table}[ht]
+	\centering
+	\small
+	\begin{tabular}{lrrrrr}
+		\toprule
+		\textbf{Scenario} & \textbf{Prior MAE} & \textbf{Hybrid MAE} & \textbf{Prior RMSE} & \textbf{Hybrid RMSE} & \textbf{Blend} \\
+		\midrule
+		START & 5.5717 & 5.5709 & 8.4134 & 8.4133 & 1.00 \\
+		MIDDLE & 4.5137 & 4.5137 & 5.4412 & 5.4412 & 0.00 \\
+		END & 5.0423 & 5.0384 & 6.3765 & 6.3708 & 1.00 \\
+		RANDOM & 0.3524 & 0.3524 & 0.8826 & 0.8826 & 0.00 \\
+		\bottomrule
+	\end{tabular}
+	\caption{Comparison between the deterministic prior and the final gated hybrid output.}
+	\label{tab:prior-gate-results}
+\end{table}
+
+\subsection{Windowed inference and overlap averaging}
+
+The model reconstructs the full sequence through sliding windows. Each window produces a residual reconstruction, and overlapping predictions are averaged at each timestamp. This stitching step matters because a single window boundary can create small discontinuities. Averaging across overlapping windows gives each timestamp several chances to be reconstructed from slightly different local contexts.
+
+The qualitative value of overlap averaging should be checked visually. It is possible for the average error to improve while the plotted reconstruction still has awkward bends or local flattening. For this reason, the notebook produces per-position plots where the ground truth, observed values, selected baselines, and hybrid output are shown together. Those figures should be inserted in Section~\ref{sec:visual-results}.
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: Windowed inference and overlap stitching.}\\
+	Use a diagram or notebook-generated illustration showing sliding windows, overlapping predictions, and averaging into a final imputed sequence.}
+	\caption{Windowed reconstruction and overlap averaging used during hybrid LSTM-VAE inference.}
+	\label{fig:results-window-stitching}
+\end{figure}
 
 \section{Visual Comparison of Reconstructions}
-\subsection{Overall series reconstruction plots}
-\subsection{Zoomed views around missing segments}
-\subsection{Outlier reconstruction examples}
-\subsection{Cases where methods diverge}
+\label{sec:visual-results}
+
+The numerical results show that the hybrid method has the lowest error, but plots are still needed. Sensor imputation is partly a shape problem. A method can obtain a low average error while producing a curve that looks locally strange, especially near the edge of a gap. The visual comparisons should show whether the imputed series follows the ground truth smoothly, whether it over-flattens the missing region, and whether it produces sudden jumps at mask boundaries.
+
+\subsection{Overall reconstruction plots}
+
+The first visual result should show the reconstructed temperature series under the four missingness positions. A four-panel figure is useful here because it lets the reader see how different the problem is across \texttt{START}, \texttt{MIDDLE}, \texttt{END}, and \texttt{RANDOM}. The whole-series plot does not need to show every small local detail, but it should make the missing regions and reconstructed regions obvious.
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: Hybrid reconstructions across all missingness positions.}\\
+	Use the four-panel plot from the main notebook showing ground truth, observed masked values, and hybrid LSTM-VAE reconstruction for \texttt{START}, \texttt{MIDDLE}, \texttt{END}, and \texttt{RANDOM}.}
+	\caption{Hybrid LSTM-VAE reconstructions across the four missingness scenarios.}
+	\label{fig:results-hybrid-reconstructions}
+\end{figure}
+
+\subsection{Model versus statistical baselines}
+
+The next set of figures should compare the hybrid model with the most interpretable statistical/time-aware baselines. The notebook uses mean, median, forward fill, and linear interpolation for these plots. This is a good selection because it avoids overcrowding the figure while still showing the main behaviours: flat replacement, carry-forward behaviour, interpolation, and the proposed hybrid output.
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: START comparison against statistical/time-aware baselines.}\\
+	Show a representative \texttt{START} segment with ground truth, observed values, mean, median, forward fill, linear interpolation, and hybrid LSTM-VAE.}
+	\caption{Visual comparison for \texttt{START} missingness against statistical/time-aware baselines.}
+	\label{fig:results-start-stat-visual}
+\end{figure}
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: MIDDLE comparison against statistical/time-aware baselines.}\\
+	Show a representative \texttt{MIDDLE} segment with ground truth, observed values, mean, median, forward fill, linear interpolation, and hybrid LSTM-VAE.}
+	\caption{Visual comparison for \texttt{MIDDLE} missingness against statistical/time-aware baselines.}
+	\label{fig:results-middle-stat-visual}
+\end{figure}
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: END comparison against statistical/time-aware baselines.}\\
+	Show a representative \texttt{END} segment with ground truth, observed values, mean, median, forward fill, linear interpolation, and hybrid LSTM-VAE.}
+	\caption{Visual comparison for \texttt{END} missingness against statistical/time-aware baselines.}
+	\label{fig:results-end-stat-visual}
+\end{figure}
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: RANDOM comparison against statistical/time-aware baselines.}\\
+	Show a representative \texttt{RANDOM} segment with ground truth, observed values, mean, median, forward fill, linear interpolation, and hybrid LSTM-VAE.}
+	\caption{Visual comparison for \texttt{RANDOM} missingness against statistical/time-aware baselines.}
+	\label{fig:results-random-stat-visual}
+\end{figure}
+
+\subsection{Model versus machine-learning baselines}
+
+The machine-learning visual comparisons should be inserted separately. These plots should include KNN Regressor, Ridge Regression, HistGradientBoosting, IterativeImputer (BR), and the hybrid LSTM-VAE. The likely pattern is that KNN and ridge struggle in boundary and long-block settings, while IterativeImputer stays closer to the truth but still trails the hybrid method. For \texttt{RANDOM}, the scale of the plot should be chosen carefully because the error values are much smaller than in the block-missingness cases.
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: Hybrid LSTM-VAE versus ML baselines.}\\
+	Use the four-panel notebook plot comparing KNN Regressor, Ridge Regression, HistGradientBoosting, IterativeImputer (BR), and the hybrid LSTM-VAE.}
+	\caption{Visual comparison between the hybrid LSTM-VAE and machine-learning baselines.}
+	\label{fig:results-ml-visual}
+\end{figure}
 
 \section{Quantitative Comparison}
-\subsection{MAE comparison across methods}
-\subsection{RMSE comparison across methods}
-\subsection{Ranking of methods by gap type}
-\subsection{Summary of best-performing approach}
+\label{sec:quantitative-comparison}
+
+\subsection{Win-rate summary}
+
+The win-rate summary is compact but useful. Against the statistical/time-aware baselines, the hybrid model wins all 72 comparisons. This count comes from 9 baselines, 4 missingness scenarios, and 2 metrics:
+\[
+9 \times 4 \times 2 = 72.
+\]
+Against the machine-learning baselines, it wins all 32 comparisons:
+\[
+4 \times 4 \times 2 = 32.
+\]
+This means the hybrid model has lower MAE and lower RMSE than every baseline under every missingness scenario reported in the current experiment.
+
+\begin{table}[ht]
+	\centering
+	\small
+	\begin{tabular}{lrrr}
+		\toprule
+		\textbf{Comparison group} & \textbf{Wins} & \textbf{Total comparisons} & \textbf{Win rate} \\
+		\midrule
+		Statistical/time-aware baselines & 72 & 72 & 100.0\% \\
+		Machine-learning baselines & 32 & 32 & 100.0\% \\
+		\bottomrule
+	\end{tabular}
+	\caption{Win-rate summary for the hybrid LSTM-VAE across baseline groups.}
+	\label{tab:win-rate-summary}
+\end{table}
+
+\subsection{Improvement over the strongest baseline}
+
+The win rate is useful, but it can hide how close some baselines were. Table~\ref{tab:best-baseline-improvement} compares the hybrid model with the strongest non-hybrid method in each scenario. This is a stricter and more interesting comparison than simply comparing against all baselines.
+
+For statistical/time-aware baselines, the largest MAE gain occurs in \texttt{START}, where the hybrid model improves over the best baseline by about 39.4\%. For \texttt{END}, the improvement is about 14.0\%. For \texttt{MIDDLE} and \texttt{RANDOM}, the improvement over interpolation is small: about 2.0\% and 1.3\% respectively. This is not a failure. It says that interpolation is already very strong when the missing pattern leaves usable local context.
+
+For machine-learning baselines, the improvement is larger. The hybrid model improves over the best ML baseline by about 39.7\% in \texttt{START}, 35.8\% in \texttt{MIDDLE}, 14.0\% in \texttt{END}, and 54.3\% in \texttt{RANDOM}, measured by MAE. The \texttt{RANDOM} result is especially striking because the absolute errors are small, but the hybrid/interpolation prior remains much closer than the lag-based ML models.
+
+\begin{table}[ht]
+	\centering
+	\small
+	\begin{tabular}{llrrr}
+		\toprule
+		\textbf{Group} & \textbf{Scenario} & \textbf{Best baseline MAE} & \textbf{Hybrid MAE} & \textbf{MAE reduction} \\
+		\midrule
+		Statistical/time-aware & START & 9.1957 & 5.5709 & 39.42\% \\
+		Statistical/time-aware & MIDDLE & 4.6072 & 4.5137 & 2.03\% \\
+		Statistical/time-aware & END & 5.8609 & 5.0384 & 14.03\% \\
+		Statistical/time-aware & RANDOM & 0.3571 & 0.3524 & 1.32\% \\
+		Machine learning & START & 9.2346 & 5.5709 & 39.67\% \\
+		Machine learning & MIDDLE & 7.0269 & 4.5137 & 35.77\% \\
+		Machine learning & END & 5.8575 & 5.0384 & 13.98\% \\
+		Machine learning & RANDOM & 0.7717 & 0.3524 & 54.33\% \\
+		\bottomrule
+	\end{tabular}
+	\caption{MAE reduction of the hybrid model relative to the strongest non-hybrid method in each comparison group.}
+	\label{tab:best-baseline-improvement}
+\end{table}
+
+\subsection{Runtime comparison}
+
+Runtime is not the main goal of this thesis, but it is part of the practical story. The simple baselines are extremely fast. All statistical/time-aware baselines together take between about 0.0097 and 0.0154 seconds per missingness scenario. The hybrid model takes 0.1020 seconds for \texttt{MIDDLE}, 0.1086 seconds for \texttt{RANDOM}, 1.8241 seconds for \texttt{END}, and 2.1139 seconds for \texttt{START}. The boundary cases are slower because the seasonal KNN prior and windowed neural reconstruction have more work to do.
+
+Compared with the machine-learning baselines, the picture is mixed. Ridge regression is faster than the hybrid model in every setting. KNN is faster than the hybrid model for \texttt{MIDDLE}, \texttt{END}, and \texttt{RANDOM}, but slower for \texttt{START}. HistGradientBoosting is slower than the hybrid model for \texttt{MIDDLE} and \texttt{RANDOM}, but faster for \texttt{START} and \texttt{END}. IterativeImputer is much slower than the hybrid model, taking roughly 25 to 30 seconds per scenario.
+
+This trade-off is reasonable for an offline thesis experiment. For a real-time edge deployment, it would need more thought. The hybrid model is not as cheap as interpolation, but it is also not prohibitively slow in this setting. A fair future comparison would separate training time, prior construction time, and neural inference time more explicitly.
+
+\begin{table}[ht]
+	\centering
+	\small
+	\begin{tabular}{lrrrr}
+		\toprule
+		\textbf{Method} & \textbf{START} & \textbf{MIDDLE} & \textbf{END} & \textbf{RANDOM} \\
+		\midrule
+		Hybrid LSTM-VAE & 2.1139 & 0.1020 & 1.8241 & 0.1086 \\
+		Mean & 0.0005 & 0.0003 & 0.0004 & 0.0002 \\
+		Median & 0.0004 & 0.0003 & 0.0004 & 0.0003 \\
+		Mode & 0.0016 & 0.0011 & 0.0013 & 0.0013 \\
+		Forward fill & 0.0012 & 0.0008 & 0.0010 & 0.0012 \\
+		Linear interpolation & 0.0073 & 0.0046 & 0.0049 & 0.0061 \\
+		KNN Regressor & 2.5203 & 0.7712 & 0.7229 & 0.8390 \\
+		Ridge Regression & 0.0653 & 0.0866 & 0.0699 & 0.0994 \\
+		HistGradientBoosting & 1.5530 & 1.4957 & 1.4340 & 1.6974 \\
+		IterativeImputer (BR) & 29.8333 & 28.8665 & 25.4975 & 27.4472 \\
+		\bottomrule
+	\end{tabular}
+	\caption{Imputation-only runtime in seconds for selected methods.}
+	\label{tab:runtime-results}
+\end{table}
+
+\begin{figure}[ht]
+	\centering
+	\placeholderbox{\textbf{Insert Figure: Runtime comparison.}\\
+	Use a bar chart showing imputation-only runtime for the hybrid model, statistical/time-aware baselines, and ML baselines. Consider using a log scale or separate panels because the IterativeImputer runtime is much larger than the simple baselines.}
+	\caption{Imputation-only runtime comparison across methods and missingness scenarios.}
+	\label{fig:results-runtime}
+\end{figure}
 
 \section{Discussion}
+\label{sec:discussion}
+
 \subsection{Why simpler baselines succeed or fail}
-\subsection{Where the LSTM-VAE adds value}
-\subsection{Effect of window size and sequence context}
-\subsection{Impact of masking strategy on reported performance}
-\subsection{Interpretation of results for sensor data imputation}
+
+The baseline results make intuitive sense once the missingness pattern is considered. For \texttt{RANDOM} missingness, linear interpolation is very strong. It has MAE 0.3571 and RMSE 0.9214, only slightly worse than the hybrid result. This happens because random missing points usually sit between observed neighbours. A five-minute or ten-minute local change in temperature can often be estimated well by drawing a line between nearby readings.
+
+For \texttt{MIDDLE} missingness, interpolation is still the best statistical/time-aware baseline. Its MAE is 4.6072, close to the hybrid result of 4.5137. The gap is much larger than in \texttt{RANDOM}, but interpolation still has endpoints on both sides of the missing block. That gives it a useful anchor. The drawback is that a long straight line can miss local curvature, but in this experiment it remains surprisingly competitive.
+
+The boundary cases tell a different story. In \texttt{START}, forward fill, LOCF, LOCB, and linear interpolation all give the same weak result because they collapse into boundary filling. They do not have earlier observations to guide the missing beginning of the sequence. In \texttt{END}, these same methods perform better than in \texttt{START}, but they still trail the hybrid model. Mean imputation is unexpectedly competitive for \texttt{END}, with MAE 5.8609. That may suggest that the final block of the series is closer to the observed central tendency than the starting block is. It is a useful reminder that a simple baseline can sometimes do well for dataset-specific reasons, even when its assumptions are thin.
+
+\subsection{Where the hybrid LSTM-VAE adds value}
+
+The proposed method adds value in two ways. The first is through the prior. The method does not begin from zero-filled gaps. It starts with interpolation for \texttt{MIDDLE} and \texttt{RANDOM}, and seasonal KNN for \texttt{START} and \texttt{END}. This choice already gives the model a plausible signal to refine. In a smooth temperature series, that matters more than model complexity for its own sake.
+
+The second contribution is the residual gate. The gate is conservative, and that is a good thing here. For \texttt{MIDDLE} and \texttt{RANDOM}, it keeps the prior unchanged. At first, this may feel like the LSTM-VAE is not doing much in those scenarios. But the alternative would be worse: forcing a neural residual into a case where interpolation is already reliable could increase the error. For \texttt{START} and \texttt{END}, the gate allows the residual correction. The correction is small, but it does improve the prior in both MAE and RMSE.
+
+This means the phrase "hybrid LSTM-VAE" should be interpreted carefully. The winning method is not a pure LSTM-VAE. It is a prior-guided, residual, gated LSTM-VAE. The deterministic prior is a major part of the performance. The neural model contributes more selectively. That is not a weakness of the study; it is one of the main lessons from the result.
+
+\subsection{Effect of gap type on performance}
+
+The gap type has a clear effect on the error values. \texttt{RANDOM} missingness is easiest by a wide margin. The hybrid MAE is 0.3524, far lower than the block and boundary cases. This is expected because local continuity remains available for most hidden points.
+
+\texttt{MIDDLE}, \texttt{START}, and \texttt{END} all produce larger errors, but for different reasons. \texttt{MIDDLE} has both left and right context, but the hidden block is long. \texttt{START} lacks past context entirely. \texttt{END} lacks future context. These are not just technical differences in mask construction. They represent genuinely different imputation tasks. A method that is strong for random missingness should not automatically be trusted for a boundary failure.
+
+The results also suggest that \texttt{START} is the most challenging boundary case in this dataset. The hybrid model's START RMSE is 8.4133, while END RMSE is 6.3708. The difference may reflect the temperature distribution in the hidden regions, the seasonal location of the block, or the availability of comparable observed calendar patterns. This would be worth checking visually before making a strong claim about boundary missingness in general.
+
+\subsection{Interpretation of the machine-learning baseline behaviour}
+
+The lag-based ML baselines do not perform as well as the hybrid method. KNN and ridge regression are especially weak for block and boundary masks. This appears to be tied to the lag-feature construction. The models receive 48 lagged values and 48 lagged mask indicators. For scattered missing values, this can be useful. For a long block, many lagged positions inside the missing region are unobserved or placeholder-filled. For \texttt{START}, the earliest points have almost no valid previous context. The models then have little real information to work with.
+
+The IterativeImputer performs best among the ML baselines. This makes sense because it can use relationships across the lag/Hankel representation rather than predicting each timestamp only from a fixed local feature vector. It is still slower than the hybrid method and less accurate in every scenario. HistGradientBoosting sits in the middle: it handles some nonlinear structure, but it does not preserve sequence shape as naturally as an interpolation prior or windowed sequence model.
+
+\subsection{Practical meaning of the results}
+
+The practical conclusion is not "deep learning always wins." That would be too broad. A better conclusion is that a carefully gated hybrid model can outperform both simple and ML baselines on this controlled IoT temperature imputation task. The result is strongest for boundary and long-block settings where local methods struggle. For random gaps, the gain over interpolation is small in absolute terms, which suggests that simple interpolation may still be enough if the deployment only loses isolated readings.
+
+This distinction matters for real systems. If a sensor stream mostly has occasional single-point dropouts, a lightweight interpolation method may be hard to beat from a cost-benefit perspective. If the system experiences long outages or missing boundary segments, a seasonal prior plus residual sequence model becomes more attractive. The proposed method appears to work well because it adapts to both cases: it keeps interpolation when interpolation is enough, and uses broader prior/residual structure when local context is missing.
 
 \section{Limitations}
+\label{sec:results-limitations}
+
 \subsection{Single-sensor scope}
+
+The experiment uses one temperature channel. This makes the comparison clean, but it also narrows the claim. Many IoT deployments have multiple correlated sensors, such as temperature, humidity, light, pressure, voltage, or neighbouring spatial nodes. A multivariate model might recover some missing values more accurately by using those relationships. The present result shows what can be achieved from one univariate temperature sequence, not from a full sensor network.
+
 \subsection{Synthetic masking versus real missingness}
-\subsection{Computational cost and reproducibility considerations}
+
+The missing values are artificially introduced into an observed sequence. This is necessary for masked-point evaluation because the true values are known. It also means the missingness mechanism is controlled by the experimenter. Real missingness may be messier. A sensor may fail exactly when the environment is unusual, or a communication outage may coincide with a storm, power instability, or maintenance event. The results should be read as evidence under controlled START, MIDDLE, END, and RANDOM masks, not as proof that the same errors will hold under every real-world failure.
+
+\subsection{Outlier cleanup and raw-target evaluation}
+
+The neural model uses a cleaned training signal, while evaluation is still against the raw hidden values. This is a reasonable compromise because extreme sentinel-like readings can distort training. Still, it introduces a design choice. If the hidden region contains raw artefacts, a model trained to avoid artefacts may not reconstruct them. In many sensor applications that is desirable, because the artefact is not physically meaningful. For a strict reconstruction task, though, this distinction should be stated clearly.
+
+\subsection{Runtime and reproducibility considerations}
+
+The runtime results are imputation-only timings from the current implementation and hardware context. They do not include full model training time. They also do not fully separate prior construction from neural inference. This is acceptable for the present comparison, but future work should report training time, prior construction time, inference time, and memory use separately. That would make deployment claims easier to defend.
+
+One implementation detail should also be kept in mind when preparing the final thesis tables. In the main hybrid notebook, the random and hot-deck statistical baselines use the same sampled donor values, so their reported metrics are identical. This is defensible if hot-deck is treated as random donor sampling, but if the thesis wants to distinguish random sampling from hot-deck sampling, the two procedures should be made explicitly different and rerun before final submission.
 
 \section{Chapter Summary}
-\subsection{Key findings}
-\subsection{Transition to the conclusion chapter}
+
+This chapter reported the results of the hybrid residual LSTM-VAE imputation experiment. The model was evaluated on a 26,387-point temperature series using four 30\% missingness scenarios. Across statistical/time-aware baselines, the hybrid model achieved a win rate of 72/72. Across machine-learning baselines, it achieved a win rate of 32/32. The strongest improvements occurred when local temporal context was limited or weak, especially in \texttt{START} and against the ML baselines.
+
+The most important interpretation is that the proposed method succeeds as a hybrid system. The deterministic prior provides a strong first estimate, and the residual gate prevents the neural model from changing the prior when validation does not support it. For \texttt{MIDDLE} and \texttt{RANDOM}, this means the final output is effectively the interpolation prior. For \texttt{START} and \texttt{END}, the residual correction is used and gives a small improvement over the prior. The result supports the central claim of the thesis: for this IoT temperature sequence, a prior-guided residual LSTM-VAE can provide more reliable imputation than common statistical and machine-learning alternatives, provided it is evaluated under gap-aware masks and against strong baselines.
