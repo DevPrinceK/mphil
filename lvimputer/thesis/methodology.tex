@@ -86,6 +86,11 @@ Random and hot-deck imputation fill missing positions by sampling values from th
 \subsection{Time-Aware Baselines}
 Forward fill, last observation carried forward (LOCF), last observation carried backward (LOCB), and linear interpolation exploit temporal order. Forward fill and LOCF use the most recent available reading, with back-filling used to handle initial gaps. LOCB uses the next available reading, with forward filling used when needed. Linear interpolation estimates missing values along straight lines between neighbouring observations and then fills boundary values. These methods are strong baselines for slowly varying physical signals.
 
+\subsection{Machine-Learning Baselines}
+In addition to the statistical baselines, machine-learning baselines are evaluated using lag-based features. For each timestamp, a feature vector is constructed from the previous $L=48$ filled readings and the corresponding lagged mask indicators. Missing values in the feature construction stage are filled with a neutral placeholder, while the mask features tell the model which lagged values were originally observed.
+
+Four machine-learning baselines are used. KNN regression predicts missing values from nearby lag-feature patterns. Ridge regression provides a regularised linear baseline over the same lag representation. Histogram Gradient Boosting captures nonlinear relationships between lagged readings and the target value. Finally, an IterativeImputer with a Bayesian Ridge estimator is applied to a lag/Hankel matrix, giving a MICE-style baseline that repeatedly estimates missing entries from neighbouring lag columns. These methods provide a stronger comparison group than simple interpolation because they can learn local temporal patterns from the observed portion of the sequence.
+
 \begin{figure}[ht]
 	\centering
 	\placeholderbox{\textbf{Insert Figure: Baseline comparison.}\\
