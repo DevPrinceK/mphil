@@ -1,0 +1,48 @@
+%% Figure 3.4: Baseline method groups used for comparison
+flowchart TB
+    A[Observed series with synthetic mask] --> B[Baseline imputers]
+
+    B --> C[Constant statistical]
+    C --> C1[Mean]
+    C --> C2[Median]
+    C --> C3[Mode]
+
+    B --> D[Sampling based]
+    D --> D1[Random donor sampling]
+    D --> D2[Hot-deck sampling]
+
+    B --> E[Time-aware]
+    E --> E1[Forward fill]
+    E --> E2[LOCF]
+    E --> E3[LOCB]
+    E --> E4[Linear interpolation]
+
+    B --> F[Machine-learning]
+    F --> F1[Lag and mask features<br/>L = 48]
+    F1 --> F2[KNN regression]
+    F1 --> F3[Ridge regression]
+    F1 --> F4[Histogram gradient boosting]
+    F1 --> F5[Iterative imputer<br/>Bayesian ridge]
+
+    C1 --> G[Masked-point MAE and RMSE]
+    C2 --> G
+    C3 --> G
+    D1 --> G
+    D2 --> G
+    E1 --> G
+    E2 --> G
+    E3 --> G
+    E4 --> G
+    F2 --> G
+    F3 --> G
+    F4 --> G
+    F5 --> G
+
+    classDef input fill:#f4f7fb,stroke:#54708c,color:#17202a;
+    classDef group fill:#fff4e6,stroke:#c47f2c,color:#17202a;
+    classDef method fill:#eef7f1,stroke:#4f8a66,color:#17202a;
+    classDef eval fill:#f7eef7,stroke:#8b5a8c,color:#17202a;
+    class A,B input;
+    class C,D,E,F group;
+    class C1,C2,C3,D1,D2,E1,E2,E3,E4,F1,F2,F3,F4,F5 method;
+    class G eval;
