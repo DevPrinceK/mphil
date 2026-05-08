@@ -1,0 +1,25 @@
+%% Additional Chapter 3 diagram: Hybrid prior construction
+flowchart LR
+    A[Masked temperature series] --> B{Missingness scenario}
+
+    B -->|MIDDLE or RANDOM| C[Time interpolation prior]
+    B -->|START or END| D[Seasonal KNN prior]
+
+    E[Calendar features] --> D
+    E --> F[sin and cos hour-of-day<br/>sin and cos day-of-year]
+    F --> D
+    G[Normalised trend feature] --> D
+
+    C --> H[Prior estimate p_t]
+    D --> H
+    H --> I[Filled model input<br/>missing values replaced by prior]
+    I --> J[Residual LSTM-VAE learns correction<br/>rather than full sequence]
+
+    classDef input fill:#f4f7fb,stroke:#54708c,color:#17202a;
+    classDef decision fill:#fff4e6,stroke:#c47f2c,color:#17202a;
+    classDef prior fill:#eef7f1,stroke:#4f8a66,color:#17202a;
+    classDef model fill:#f7eef7,stroke:#8b5a8c,color:#17202a;
+    class A,E,F,G input;
+    class B decision;
+    class C,D,H,I prior;
+    class J model;
