@@ -1,0 +1,27 @@
+%% Additional Chapter 3 diagram: Training objective and optimisation
+flowchart TB
+    A[Sliding training windows<br/>T = 96, stride = 16] --> B[Residual LSTM-VAE forward pass]
+    B --> C[Prediction x_hat_t]
+
+    C --> D[Reconstruction loss<br/>Smooth L1 on observed points only]
+    C --> E[Residual penalty<br/>discourage unnecessary prior changes]
+    B --> F[KL divergence<br/>posterior toward standard normal]
+
+    G[Beta warm-up] --> F
+    D --> H[Total objective]
+    E --> H
+    F --> H
+    H --> I[AdamW optimisation]
+    I --> J[ReduceLROnPlateau scheduler]
+    I --> K[Gradient clipping]
+    J --> L[Updated model parameters]
+    K --> L
+
+    classDef data fill:#f4f7fb,stroke:#54708c,color:#17202a;
+    classDef model fill:#eef7f1,stroke:#4f8a66,color:#17202a;
+    classDef loss fill:#fff4e6,stroke:#c47f2c,color:#17202a;
+    classDef opt fill:#f7eef7,stroke:#8b5a8c,color:#17202a;
+    class A data;
+    class B,C model;
+    class D,E,F,G,H loss;
+    class I,J,K,L opt;
