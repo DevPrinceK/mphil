@@ -1,0 +1,29 @@
+%% Figure 3.5: Residual LSTM-VAE architecture
+flowchart LR
+    A[Input window u_1:T<br/>filled value, mask, prior, calendar features] --> B[Encoder LSTM]
+    B --> C[Final hidden state]
+    C --> D[Latent mean mu]
+    C --> E[Latent log variance]
+    D --> F[Reparameterisation<br/>or mean at evaluation]
+    E --> F
+    F --> G[Latent code z]
+    G --> H[Repeat z across window]
+    I[Decoder context<br/>prior and calendar features] --> J[Concatenate]
+    H --> J
+    J --> K[Decoder LSTM]
+    K --> L[Residual head]
+    L --> M[Predicted residual r_t]
+    N[Prior p_t] --> O[Hybrid prediction<br/>x_hat_t = p_t + r_t]
+    M --> O
+    O --> P[Replace only missing positions<br/>observed raw values preserved]
+
+    classDef input fill:#f4f7fb,stroke:#54708c,color:#17202a;
+    classDef encoder fill:#eef7f1,stroke:#4f8a66,color:#17202a;
+    classDef latent fill:#fff4e6,stroke:#c47f2c,color:#17202a;
+    classDef decoder fill:#f7eef7,stroke:#8b5a8c,color:#17202a;
+    classDef output fill:#fdf2f0,stroke:#b94b4b,color:#17202a;
+    class A,I,N input;
+    class B,C encoder;
+    class D,E,F,G,H latent;
+    class J,K,L,M decoder;
+    class O,P output;
