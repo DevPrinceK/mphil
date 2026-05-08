@@ -1,0 +1,26 @@
+%% Figure 3.1: End-to-end methodology pipeline
+flowchart LR
+    A[Timestamped temperature data<br/>data/dataset1.csv] --> B[Chronological sorting<br/>and univariate extraction]
+    B --> C[Training-only robust cleaning<br/>sentinel and local artefact handling]
+    C --> D[Controlled 30 percent masking]
+    D --> E1[Statistical and<br/>time-aware baselines]
+    D --> E2[Machine-learning<br/>lag-feature baselines]
+    D --> E3[Hybrid residual<br/>LSTM-VAE]
+    E1 --> F[Imputed series]
+    E2 --> F
+    E3 --> F
+    F --> G[Masked-point evaluation<br/>MAE and RMSE]
+    F --> H[Qualitative plots]
+    F --> I[Imputation-only runtime]
+    G --> J[Baseline win rate<br/>and method comparison]
+    H --> J
+    I --> J
+
+    classDef data fill:#f4f7fb,stroke:#54708c,color:#17202a;
+    classDef process fill:#eef7f1,stroke:#4f8a66,color:#17202a;
+    classDef model fill:#fff4e6,stroke:#c47f2c,color:#17202a;
+    classDef eval fill:#f7eef7,stroke:#8b5a8c,color:#17202a;
+    class A,B data;
+    class C,D,F process;
+    class E1,E2,E3 model;
+    class G,H,I,J eval;
