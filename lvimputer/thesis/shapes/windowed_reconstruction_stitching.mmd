@@ -1,0 +1,27 @@
+%% Figure 3.7: Windowed inference and overlap averaging
+flowchart LR
+    A[Full masked sequence] --> B[Construct scenario-specific prior]
+    B --> C[Create overlapping windows<br/>length 96, stride 16]
+    C --> D1[Window 1 reconstruction]
+    C --> D2[Window 2 reconstruction]
+    C --> D3[Window k reconstruction]
+    D1 --> E[Collect per-timestep predictions]
+    D2 --> E
+    D3 --> E
+    E --> F[Average overlapping predictions]
+    F --> G[Validation-based residual gate]
+    G --> H{Residual improves<br/>MAE and RMSE?}
+    H -->|Yes| I[Blend prior and residual prediction]
+    H -->|No| J[Keep prior unchanged]
+    I --> K[Final imputed series]
+    J --> K
+    K --> L[Observed raw values retained<br/>only hidden points replaced]
+
+    classDef input fill:#f4f7fb,stroke:#54708c,color:#17202a;
+    classDef window fill:#eef7f1,stroke:#4f8a66,color:#17202a;
+    classDef gate fill:#fff4e6,stroke:#c47f2c,color:#17202a;
+    classDef output fill:#f7eef7,stroke:#8b5a8c,color:#17202a;
+    class A,B input;
+    class C,D1,D2,D3,E,F window;
+    class G,H,I,J gate;
+    class K,L output;
