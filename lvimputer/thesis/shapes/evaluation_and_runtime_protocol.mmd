@@ -1,0 +1,32 @@
+%% Figure 3.8: Evaluation and imputation-only runtime protocol
+flowchart TB
+    A[Ground-truth raw temperature sequence] --> B[Apply synthetic mask]
+    B --> C[Observed input series]
+    B --> D[Hidden index set M]
+
+    C --> E1[Baseline imputers]
+    C --> E2[Hybrid residual LSTM-VAE]
+
+    E1 --> F1[Baseline imputed values<br/>at hidden indices]
+    E2 --> F2[Hybrid imputed values<br/>at hidden indices]
+    D --> G[Compare only where m_t = 0]
+    F1 --> G
+    F2 --> G
+
+    G --> H[MAE]
+    G --> I[RMSE]
+    H --> J[Baseline win rate]
+    I --> J
+
+    E1 --> K[Imputation-only runtime]
+    E2 --> K
+    K --> L[Deployment-cost comparison<br/>training excluded]
+
+    classDef data fill:#f4f7fb,stroke:#54708c,color:#17202a;
+    classDef method fill:#eef7f1,stroke:#4f8a66,color:#17202a;
+    classDef eval fill:#fff4e6,stroke:#c47f2c,color:#17202a;
+    classDef runtime fill:#f7eef7,stroke:#8b5a8c,color:#17202a;
+    class A,B,C,D data;
+    class E1,E2,F1,F2 method;
+    class G,H,I,J eval;
+    class K,L runtime;
