@@ -1,25 +1,27 @@
 %% Additional Chapter 3 diagram: Hybrid prior construction
+%% The prior is explicit because the model learns corrections around it, not a
+%% complete sequence from a zero-filled placeholder.
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Segoe UI, Arial, sans-serif", "background": "transparent", "primaryTextColor": "#17202a", "lineColor": "#617285"}}}%%
 flowchart LR
-    A[Masked temperature series] --> B{Missingness scenario}
+    A["Masked temperature series<br/>values x_t and mask m_t"] --> B{"Gap scenario"}
 
-    B -->|MIDDLE or RANDOM| C[Time interpolation prior]
-    B -->|START or END| D[Seasonal KNN prior]
+    B -->|"MIDDLE / RANDOM"| C["Time interpolation prior<br/>uses local temporal anchors"]
+    B -->|"START / END"| D["Seasonal KNN prior<br/>uses comparable calendar contexts"]
 
-    E[Calendar features] --> D
-    E --> F[sin and cos hour-of-day<br/>sin and cos day-of-year]
-    F --> D
-    G[Normalised trend feature] --> D
+    E["Cyclic calendar features<br/>sin/cos hour, sin/cos day"] --> D
+    F["Normalised trend feature"] --> D
 
-    C --> H[Prior estimate p_t]
+    C --> H["Prior estimate p_t"]
     D --> H
-    H --> I[Filled model input<br/>missing values replaced by prior]
-    I --> J[Residual LSTM-VAE learns correction<br/>rather than full sequence]
+    H --> I["Filled model input<br/>missing values replaced by p_t"]
+    I --> J["Residual LSTM-VAE<br/>learns correction r_t"]
+    J --> K["Hybrid estimate<br/>x_hat_t = p_t + r_t"]
 
-    classDef input fill:#f4f7fb,stroke:#54708c,color:#17202a;
-    classDef decision fill:#fff4e6,stroke:#c47f2c,color:#17202a;
-    classDef prior fill:#eef7f1,stroke:#4f8a66,color:#17202a;
-    classDef model fill:#f7eef7,stroke:#8b5a8c,color:#17202a;
-    class A,E,F,G input;
+    classDef input fill:#edf4fb,stroke:#42647f,stroke-width:1.5px,color:#17202a;
+    classDef decision fill:#fff4df,stroke:#b37219,stroke-width:1.5px,color:#17202a;
+    classDef prior fill:#ecf6f0,stroke:#3f7a5a,stroke-width:1.5px,color:#17202a;
+    classDef model fill:#f7ecf7,stroke:#7f4b86,stroke-width:1.5px,color:#17202a;
+    class A,E,F input;
     class B decision;
     class C,D,H,I prior;
-    class J model;
+    class J,K model;

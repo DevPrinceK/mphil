@@ -1,35 +1,36 @@
 %% Figure 3.3: Synthetic missingness scenarios
+%% The same 26,387-point sequence is masked in four structurally different ways.
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Segoe UI, Arial, sans-serif", "background": "transparent", "primaryTextColor": "#17202a", "lineColor": "#617285"}}}%%
 flowchart TB
-    subgraph S1[START]
-        direction LR
-        S1H[Hidden<br/>first 30 percent] --> S1O[Observed<br/>remaining 70 percent]
-    end
-
-    subgraph S2[MIDDLE]
-        direction LR
-        S2O1[Observed] --> S2H[Hidden<br/>central 30 percent] --> S2O2[Observed]
-    end
-
-    subgraph S3[END]
-        direction LR
-        S3O[Observed<br/>first 70 percent] --> S3H[Hidden<br/>final 30 percent]
-    end
-
-    subgraph S4[RANDOM]
-        direction LR
-        S4A[Observed and hidden indices<br/>sampled across the full sequence] --> S4B[Fixed random seed<br/>30 percent hidden]
-    end
-
-    D[Same chronological temperature sequence<br/>N = 26,387] --> S1
+    D["Chronological temperature sequence<br/>N = 26,387"] --> S1
     D --> S2
     D --> S3
     D --> S4
 
-    classDef source fill:#f4f7fb,stroke:#54708c,color:#17202a;
-    classDef observed fill:#eef7f1,stroke:#4f8a66,color:#17202a;
-    classDef hidden fill:#fdeceb,stroke:#b94b4b,color:#17202a;
-    classDef note fill:#fff4e6,stroke:#c47f2c,color:#17202a;
+    subgraph S1["START"]
+        direction LR
+        S1H["Hidden<br/>first 30%"] --> S1O["Observed<br/>remaining 70%"]
+    end
+
+    subgraph S2["MIDDLE"]
+        direction LR
+        S2O1["Observed"] --> S2H["Hidden<br/>central 30%"] --> S2O2["Observed"]
+    end
+
+    subgraph S3["END"]
+        direction LR
+        S3O["Observed<br/>first 70%"] --> S3H["Hidden<br/>final 30%"]
+    end
+
+    subgraph S4["RANDOM"]
+        direction LR
+        S4O["Observed and hidden points<br/>scattered through sequence"] --> S4H["Fixed seed<br/>30% hidden"]
+    end
+
+    classDef source fill:#edf4fb,stroke:#42647f,stroke-width:1.5px,color:#17202a;
+    classDef observed fill:#ecf6f0,stroke:#3f7a5a,stroke-width:1.5px,color:#17202a;
+    classDef hidden fill:#fef0ec,stroke:#b64c39,stroke-width:1.5px,color:#17202a;
+    classDef note fill:#fff4df,stroke:#b37219,stroke-width:1.5px,color:#17202a;
     class D source;
-    class S1O,S2O1,S2O2,S3O observed;
-    class S1H,S2H,S3H,S4B hidden;
-    class S4A note;
+    class S1O,S2O1,S2O2,S3O,S4O observed;
+    class S1H,S2H,S3H,S4H hidden;

@@ -53,8 +53,7 @@ The four masks are not equally difficult. \texttt{RANDOM} is the easiest because
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Missingness positions.}\\
-	Use the four-panel mask plot from the notebook or regenerate it from the current masks. The figure should show \texttt{START}, \texttt{MIDDLE}, \texttt{END}, and \texttt{RANDOM} missingness over the same temperature sequence.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-missingness-positions.png}
 	\caption{Synthetic missingness scenarios used for evaluation.}
 	\label{fig:results-missingness-scenarios}
 \end{figure}
@@ -94,8 +93,7 @@ The printed training loss becomes very small early in training and stays low thr
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Training loss curve.}\\
-	Use the residual LSTM-VAE training plot showing total loss, reconstruction loss, and learning rate over 40 epochs.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-training-loss.png}
 	\caption{Training loss curve for the residual LSTM-VAE.}
 	\label{fig:results-training-loss}
 \end{figure}
@@ -157,8 +155,7 @@ Table~\ref{tab:stat-mae-results} reports MAE, and Table~\ref{tab:stat-rmse-resul
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Statistical baseline error comparison.}\\
-	Use the bar chart showing MAE and RMSE for the statistical/time-aware methods under \texttt{START}, \texttt{MIDDLE}, \texttt{END}, and \texttt{RANDOM}.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-stat-baseline-errors.png}
 	\caption{MAE and RMSE for statistical/time-aware baselines across missingness scenarios.}
 	\label{fig:results-stat-baseline-errors}
 \end{figure}
@@ -209,8 +206,7 @@ KNN and ridge regression perform poorly for the long block and boundary cases. T
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Machine-learning baseline error comparison.}\\
-	Use the four-panel bar chart comparing the hybrid LSTM-VAE with KNN Regressor, Ridge Regression, HistGradientBoosting, and IterativeImputer (BR).}
+	\includegraphics[width=\linewidth]{../imgs/thesis-ml-baseline-errors.png}
 	\caption{MAE and RMSE for machine-learning baselines across missingness scenarios.}
 	\label{fig:results-ml-baseline-errors}
 \end{figure}
@@ -270,8 +266,7 @@ The qualitative value of overlap averaging should be checked visually. It is pos
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Windowed inference and overlap stitching.}\\
-	Use a diagram or notebook-generated illustration showing sliding windows, overlapping predictions, and averaging into a final imputed sequence.}
+	\includegraphics[width=\linewidth]{../imgs/diagram-windowed-reconstruction-stitching.png}
 	\caption{Windowed reconstruction and overlap averaging used during hybrid LSTM-VAE inference.}
 	\label{fig:results-window-stitching}
 \end{figure}
@@ -287,8 +282,7 @@ The first visual result should show the reconstructed temperature series under t
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Hybrid reconstructions across all missingness positions.}\\
-	Use the four-panel plot from the main notebook showing ground truth, observed masked values, and hybrid LSTM-VAE reconstruction for \texttt{START}, \texttt{MIDDLE}, \texttt{END}, and \texttt{RANDOM}.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-hybrid-reconstructions.png}
 	\caption{Hybrid LSTM-VAE reconstructions across the four missingness scenarios.}
 	\label{fig:results-hybrid-reconstructions}
 \end{figure}
@@ -299,32 +293,28 @@ The next set of figures should compare the hybrid model with the most interpreta
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: START comparison against statistical/time-aware baselines.}\\
-	Show a representative \texttt{START} segment with ground truth, observed values, mean, median, forward fill, linear interpolation, and hybrid LSTM-VAE.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-hybrid-vs-stat-start.png}
 	\caption{Visual comparison for \texttt{START} missingness against statistical/time-aware baselines.}
 	\label{fig:results-start-stat-visual}
 \end{figure}
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: MIDDLE comparison against statistical/time-aware baselines.}\\
-	Show a representative \texttt{MIDDLE} segment with ground truth, observed values, mean, median, forward fill, linear interpolation, and hybrid LSTM-VAE.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-hybrid-vs-stat-middle.png}
 	\caption{Visual comparison for \texttt{MIDDLE} missingness against statistical/time-aware baselines.}
 	\label{fig:results-middle-stat-visual}
 \end{figure}
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: END comparison against statistical/time-aware baselines.}\\
-	Show a representative \texttt{END} segment with ground truth, observed values, mean, median, forward fill, linear interpolation, and hybrid LSTM-VAE.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-hybrid-vs-stat-end.png}
 	\caption{Visual comparison for \texttt{END} missingness against statistical/time-aware baselines.}
 	\label{fig:results-end-stat-visual}
 \end{figure}
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: RANDOM comparison against statistical/time-aware baselines.}\\
-	Show a representative \texttt{RANDOM} segment with ground truth, observed values, mean, median, forward fill, linear interpolation, and hybrid LSTM-VAE.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-hybrid-vs-stat-random.png}
 	\caption{Visual comparison for \texttt{RANDOM} missingness against statistical/time-aware baselines.}
 	\label{fig:results-random-stat-visual}
 \end{figure}
@@ -335,8 +325,7 @@ The machine-learning visual comparisons should be inserted separately. These plo
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Hybrid LSTM-VAE versus ML baselines.}\\
-	Use the four-panel notebook plot comparing KNN Regressor, Ridge Regression, HistGradientBoosting, IterativeImputer (BR), and the hybrid LSTM-VAE.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-hybrid-vs-ml-visual-grid.png}
 	\caption{Visual comparison between the hybrid LSTM-VAE and machine-learning baselines.}
 	\label{fig:results-ml-visual}
 \end{figure}
@@ -433,8 +422,7 @@ This trade-off is reasonable for an offline thesis experiment. For a real-time e
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Runtime comparison.}\\
-	Use a bar chart showing imputation-only runtime for the hybrid model, statistical/time-aware baselines, and ML baselines. Consider using a log scale or separate panels because the IterativeImputer runtime is much larger than the simple baselines.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-runtime-comparison.png}
 	\caption{Imputation-only runtime comparison across methods and missingness scenarios.}
 	\label{fig:results-runtime}
 \end{figure}

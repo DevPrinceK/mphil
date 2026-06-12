@@ -1,26 +1,29 @@
 %% Additional Chapter 3 diagram: Training objective and optimisation
+%% Separates model outputs, loss components, and optimiser controls.
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Segoe UI, Arial, sans-serif", "background": "transparent", "primaryTextColor": "#17202a", "lineColor": "#617285"}}}%%
 flowchart TB
-    A[Sliding training windows<br/>T = 96, stride = 16] --> B[Residual LSTM-VAE forward pass]
-    B --> C[Prediction x_hat_t]
+    A["Sliding training windows<br/>T = 96, stride = 16"] --> B["Residual LSTM-VAE<br/>forward pass"]
+    B --> C["Prediction x_hat_t"]
 
-    C --> D[Reconstruction loss<br/>Smooth L1 on observed points only]
-    C --> E[Residual penalty<br/>discourage unnecessary prior changes]
-    B --> F[KL divergence<br/>posterior toward standard normal]
+    C --> D["Reconstruction loss<br/>Smooth L1 on observed points"]
+    C --> E["Residual penalty<br/>discourages unnecessary prior changes"]
+    B --> F["KL divergence<br/>posterior toward standard normal"]
+    G["Beta warm-up"] --> F
 
-    G[Beta warm-up] --> F
-    D --> H[Total objective]
+    D --> H["Total objective<br/>L_rec + beta L_KL + lambda L_res"]
     E --> H
     F --> H
-    H --> I[AdamW optimisation]
-    I --> J[ReduceLROnPlateau scheduler]
-    I --> K[Gradient clipping]
-    J --> L[Updated model parameters]
+
+    H --> I["AdamW optimisation"]
+    I --> J["ReduceLROnPlateau<br/>learning-rate scheduler"]
+    I --> K["Gradient clipping"]
+    J --> L["Updated model parameters"]
     K --> L
 
-    classDef data fill:#f4f7fb,stroke:#54708c,color:#17202a;
-    classDef model fill:#eef7f1,stroke:#4f8a66,color:#17202a;
-    classDef loss fill:#fff4e6,stroke:#c47f2c,color:#17202a;
-    classDef opt fill:#f7eef7,stroke:#8b5a8c,color:#17202a;
+    classDef data fill:#edf4fb,stroke:#42647f,stroke-width:1.5px,color:#17202a;
+    classDef model fill:#ecf6f0,stroke:#3f7a5a,stroke-width:1.5px,color:#17202a;
+    classDef loss fill:#fff4df,stroke:#b37219,stroke-width:1.5px,color:#17202a;
+    classDef opt fill:#f7ecf7,stroke:#7f4b86,stroke-width:1.5px,color:#17202a;
     class A data;
     class B,C model;
     class D,E,F,G,H loss;

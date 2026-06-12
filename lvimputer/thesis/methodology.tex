@@ -27,8 +27,7 @@ The workflow is:
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: End-to-end methodology pipeline.}\\
-	Suggested content: raw temperature series \textrightarrow{} chronological preprocessing \textrightarrow{} missingness masks \textrightarrow{} baseline imputers and hybrid residual LSTM-VAE \textrightarrow{} imputed series \textrightarrow{} MAE/RMSE, plots, and runtime comparison.}
+	\includegraphics[width=\linewidth]{../imgs/diagram-method-pipeline.png}
 	\caption{End-to-end workflow used in this research, from data ingestion to evaluation.}
 	\label{fig:method-pipeline}
 \end{figure}
@@ -40,8 +39,7 @@ The study focuses on a single continuous temperature channel. This keeps the imp
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Raw temperature time series.}\\
-	Suggested content: line plot of temperature against datetime before synthetic masking.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-raw-temperature-timeseries.png}
 	\caption{Raw temperature time series after chronological sorting.}
 	\label{fig:raw-timeseries}
 \end{figure}
@@ -68,8 +66,7 @@ These scenarios test different imputation difficulties. RANDOM missingness is we
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Missingness scenarios.}\\
-	Suggested content: four panels showing START, MIDDLE, END, and RANDOM masks over the same temperature sequence.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-missingness-positions.png}
 	\caption{Synthetic missingness scenarios used for controlled evaluation.}
 	\label{fig:mask-visualisation}
 \end{figure}
@@ -93,8 +90,7 @@ Four machine-learning baselines are used. KNN regression predicts missing values
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Baseline comparison.}\\
-	Suggested content: zoomed segment showing ground truth, observed values, mean/median, forward fill, and linear interpolation.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-baseline-segment-grid.png}
 	\caption{Example segment comparing baseline imputations to the ground truth.}
 	\label{fig:baseline-visual}
 \end{figure}
@@ -150,8 +146,7 @@ The decoder receives the latent code repeated across the window and concatenated
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Residual LSTM-VAE architecture.}\\
-	Suggested content: filled value + mask + prior + calendar features \textrightarrow{} encoder LSTM \textrightarrow{} $\mu,\log\sigma^2$ \textrightarrow{} latent code \textrightarrow{} decoder LSTM \textrightarrow{} residual \textrightarrow{} prior + residual.}
+	\includegraphics[width=\linewidth]{../imgs/diagram-residual-lstm-vae-architecture.png}
 	\caption{Architecture of the residual LSTM-VAE used for hybrid time-series imputation.}
 	\label{fig:lstm-vae-arch}
 \end{figure}
@@ -191,8 +186,7 @@ Training is performed on masked windows generated from the full sequence. The mo
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Training loss curve.}\\
-	Suggested content: epoch-wise total loss, reconstruction loss, and learning rate.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-training-loss.png}
 	\caption{Training dynamics of the residual LSTM-VAE under mini-batch optimisation.}
 	\label{fig:training-curve}
 \end{figure}
@@ -213,8 +207,7 @@ x_t, & m_t=1,\\
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Windowed reconstruction stitching.}\\
-	Suggested content: overlapping windows over the timeline and averaging of predictions into one final imputed series.}
+	\includegraphics[width=\linewidth]{../imgs/diagram-windowed-reconstruction-stitching.png}
 	\caption{Windowed inference and overlap-averaging used to stitch reconstructions into a full-length imputation.}
 	\label{fig:window-stitching}
 \end{figure}
@@ -244,16 +237,14 @@ Runtime is measured separately from training. The recorded time covers only the 
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Method comparison by missingness scenario.}\\
-	Suggested content: four plots comparing ground truth, selected baselines, and hybrid LSTM-VAE for START, MIDDLE, END, and RANDOM.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-hybrid-vs-stat-grid.png}
 	\caption{Qualitative comparison of hybrid LSTM-VAE imputation against baseline methods.}
 	\label{fig:qualitative-imputation}
 \end{figure}
 
 \begin{figure}[ht]
 	\centering
-	\placeholderbox{\textbf{Insert Figure: Imputation-only runtime comparison.}\\
-	Suggested content: bar chart showing runtime in seconds for the hybrid model and baselines under each missingness scenario.}
+	\includegraphics[width=\linewidth]{../imgs/thesis-runtime-comparison.png}
 	\caption{Imputation-only runtime comparison across methods and missingness scenarios.}
 	\label{fig:runtime-comparison}
 \end{figure}

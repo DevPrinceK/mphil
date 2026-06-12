@@ -1,26 +1,32 @@
 %% Figure 3.7: Windowed inference and overlap averaging
+%% Inference is windowed, stitched by overlap averaging, then filtered through a
+%% conservative residual gate before final replacement.
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Segoe UI, Arial, sans-serif", "background": "transparent", "primaryTextColor": "#17202a", "lineColor": "#617285"}}}%%
 flowchart LR
-    A[Full masked sequence] --> B[Construct scenario-specific prior]
-    B --> C[Create overlapping windows<br/>length 96, stride 16]
-    C --> D1[Window 1 reconstruction]
-    C --> D2[Window 2 reconstruction]
-    C --> D3[Window k reconstruction]
-    D1 --> E[Collect per-timestep predictions]
+    A["Full masked sequence"] --> B["Scenario-specific prior"]
+    B --> C["Overlapping windows<br/>length 96, evaluation stride 48"]
+
+    C --> D1["Window 1<br/>residual prediction"]
+    C --> D2["Window 2<br/>residual prediction"]
+    C --> D3["Window k<br/>residual prediction"]
+
+    D1 --> E["Collect predictions<br/>by timestamp"]
     D2 --> E
     D3 --> E
-    E --> F[Average overlapping predictions]
-    F --> G[Validation-based residual gate]
-    G --> H{Residual improves<br/>MAE and RMSE?}
-    H -->|Yes| I[Blend prior and residual prediction]
-    H -->|No| J[Keep prior unchanged]
-    I --> K[Final imputed series]
-    J --> K
-    K --> L[Observed raw values retained<br/>only hidden points replaced]
+    E --> F["Overlap average<br/>one value per timestamp"]
 
-    classDef input fill:#f4f7fb,stroke:#54708c,color:#17202a;
-    classDef window fill:#eef7f1,stroke:#4f8a66,color:#17202a;
-    classDef gate fill:#fff4e6,stroke:#c47f2c,color:#17202a;
-    classDef output fill:#f7eef7,stroke:#8b5a8c,color:#17202a;
+    F --> G["Validation residual gate"]
+    G --> H{"Improves both<br/>MAE and RMSE?"}
+    H -->|"Yes"| I["Blend prior with<br/>residual prediction"]
+    H -->|"No"| J["Keep prior unchanged"]
+    I --> K["Final imputed series"]
+    J --> K
+    K --> L["Observed raw values retained<br/>only hidden points replaced"]
+
+    classDef input fill:#edf4fb,stroke:#42647f,stroke-width:1.5px,color:#17202a;
+    classDef window fill:#ecf6f0,stroke:#3f7a5a,stroke-width:1.5px,color:#17202a;
+    classDef gate fill:#fff4df,stroke:#b37219,stroke-width:1.5px,color:#17202a;
+    classDef output fill:#f7ecf7,stroke:#7f4b86,stroke-width:1.5px,color:#17202a;
     class A,B input;
     class C,D1,D2,D3,E,F window;
     class G,H,I,J gate;

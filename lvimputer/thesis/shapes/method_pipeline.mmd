@@ -1,26 +1,44 @@
 %% Figure 3.1: End-to-end methodology pipeline
+%% Redrawn as a thesis-ready workflow: shared data/masks first, then baseline and
+%% hybrid branches, then a common evaluation layer.
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Segoe UI, Arial, sans-serif", "background": "transparent", "primaryTextColor": "#17202a", "lineColor": "#617285"}}}%%
 flowchart LR
-    A[Timestamped temperature data<br/>data/dataset1.csv] --> B[Chronological sorting<br/>and univariate extraction]
-    B --> C[Training-only robust cleaning<br/>sentinel and local artefact handling]
-    C --> D[Controlled 30 percent masking]
-    D --> E1[Statistical and<br/>time-aware baselines]
-    D --> E2[Machine-learning<br/>lag-feature baselines]
-    D --> E3[Hybrid residual<br/>LSTM-VAE]
-    E1 --> F[Imputed series]
+    subgraph Prep["Data preparation"]
+        A["Timestamped temperature data<br/>data/dataset1.csv"] --> B["Chronological sorting<br/>temperature channel only"]
+        B --> C["Training-only robust cleaning<br/>sentinel and local artefact handling"]
+    end
+
+    subgraph Mask["Shared masking protocol"]
+        C --> D["Controlled 30% masks<br/>START / MIDDLE / END / RANDOM"]
+    end
+
+    subgraph Methods["Imputation methods"]
+        D --> E1["Statistical and time-aware<br/>baselines"]
+        D --> E2["Lag-feature machine-learning<br/>baselines"]
+        D --> P["Scenario-specific prior<br/>interpolation or seasonal KNN"]
+        P --> E3["Prior-guided residual<br/>LSTM-VAE"]
+    end
+
+    E1 --> F["Completed series"]
     E2 --> F
     E3 --> F
-    F --> G[Masked-point evaluation<br/>MAE and RMSE]
-    F --> H[Qualitative plots]
-    F --> I[Imputation-only runtime]
-    G --> J[Baseline win rate<br/>and method comparison]
-    H --> J
-    I --> J
 
-    classDef data fill:#f4f7fb,stroke:#54708c,color:#17202a;
-    classDef process fill:#eef7f1,stroke:#4f8a66,color:#17202a;
-    classDef model fill:#fff4e6,stroke:#c47f2c,color:#17202a;
-    classDef eval fill:#f7eef7,stroke:#8b5a8c,color:#17202a;
+    subgraph Eval["Evaluation and interpretation"]
+        F --> G["Masked-point error<br/>MAE and RMSE"]
+        F --> H["Qualitative reconstruction<br/>plots"]
+        F --> I["Imputation-only runtime<br/>training excluded"]
+        G --> J["Win rate and method<br/>comparison"]
+        H --> J
+        I --> J
+    end
+
+    classDef data fill:#edf4fb,stroke:#42647f,stroke-width:1.5px,color:#17202a;
+    classDef process fill:#ecf6f0,stroke:#3f7a5a,stroke-width:1.5px,color:#17202a;
+    classDef model fill:#fff4df,stroke:#b37219,stroke-width:1.5px,color:#17202a;
+    classDef hybrid fill:#f7ecf7,stroke:#7f4b86,stroke-width:1.5px,color:#17202a;
+    classDef eval fill:#fef0ec,stroke:#b64c39,stroke-width:1.5px,color:#17202a;
     class A,B data;
     class C,D,F process;
-    class E1,E2,E3 model;
+    class E1,E2,P model;
+    class E3 hybrid;
     class G,H,I,J eval;
